@@ -3,7 +3,7 @@
 # ==============================================================
 
 cmake_minimum_required(VERSION 3.20)
-project(CacheOptimizedRBTree)
+project(FlatRBTreeTest)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -19,9 +19,9 @@ enable_testing()
 cmake_path(GET CMAKE_CURRENT_SOURCE_DIR PARENT_PATH PARENT_DIR)
 
 # Add a testing executable
-add_executable(${PROJECT_NAME} optimized-rb-tree-test.cpp)
+add_executable(${PROJECT_NAME} flat-rb-tree-test.cpp)
 
-target_include_directories(${PROJECT_NAME} PRIVATE ${PARENT_DIR}/src)
+target_include_directories(${PROJECT_NAME} PRIVATE ${PARENT_DIR}/include)
 
 # target_link_libraries(${PROJECT_NAME} LINK_PUBLIC GTest::GTest GTest::Main)
 
