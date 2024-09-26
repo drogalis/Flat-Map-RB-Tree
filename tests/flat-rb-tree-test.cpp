@@ -1,7 +1,13 @@
-// Andrew Drogalis
+// Andrew Drogalis Copyright (c) 2024, GNU 3.0 Licence
+//
+// This library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.rogalis
 
 #include "dro/flat-rb-tree.hpp"
 #include "stl_tree_public.h"
+
 #include <algorithm>
 #include <bits/concept_check.h>
 #include <bits/stl_function.h>
@@ -10,11 +16,17 @@
 #include <iostream>
 #include <iterator>
 #include <random>
+#include <string>
 #include <vector>
 
+namespace dro {
+
+namespace details {
+
 template <typename T> struct TreeBuilder {
-  dro::FlatRBTree<T> droRBTree;
+  FlatRBTree<T, EmptyType> droRBTree;
   std::_Rb_tree<T, T, std::_Identity<T>, std::less<T>> gccRBTree;
+  std::string error_message;
 
   void insert(T key) {
     droRBTree.insert(key);
@@ -23,12 +35,10 @@ template <typename T> struct TreeBuilder {
   }
 
   void erase(T key) {
-    droRBTree.remove(key);
+    droRBTree.erase(key);
     gccRBTree.erase(key);
     validateTree();
   }
-
-  void print_vals() { droRBTree.print_vals(); }
 
   void validateTree() {
     auto gccRoot = gccRBTree._M_root();
@@ -36,18 +46,17 @@ template <typename T> struct TreeBuilder {
     if (gccRoot) {
       T gccRootKey =
           std::_Rb_tree<T, T, std::_Identity<T>, std::less<T>>::_S_key(gccRoot);
-      if (droRBTree.tree_[droRoot].data_ != gccRootKey ||
+      if (droRBTree.tree_[droRoot].key_ != gccRootKey ||
           droRBTree.tree_[droRoot].color_ != gccRoot->_M_color) {
         throw std::logic_error("Tree Roots out of sync");
       }
-      if (droRBTree.tree_[droRoot].parent_ != droRBTree.empty_value_) {
+      if (droRBTree.tree_[droRoot].parent_ != droRBTree.empty_index_) {
         throw std::logic_error("Tree Roots Parent out of sync");
       }
-      // std::cout << "\nRoot: " << gccRootKey << " " << gccRoot->_M_color << '\n';
       traverseTree(droRoot, gccRoot);
     } else {
-      if (droRoot != droRBTree.empty_value_) {
-        throw std::logic_error("Sync Error at Root");
+      if (droRoot != droRBTree.empty_index_) {
+        throw std::logic_error("Tree Root should be empty_index");
       }
     }
   }
@@ -60,21 +69,24 @@ template <typename T> struct TreeBuilder {
       T gccLeftKey =
           std::_Rb_tree<T, T, std::_Identity<T>, std::less<T>>::_S_key(
               gccLeftNode);
-      // std::cout << "Left: " << gccLeftKey << ' ' << gccLeftNode->_M_color
-      //           << " Dro: " << droRBTree.tree_[droLeftNode].data_ << " "
-      //           << droRBTree.tree_[droLeftNode].color_ << " Index: " << droLeftNode << '\n';
 
-      if (droRBTree.tree_[droLeftNode].data_ != gccLeftKey ||
+      if (droRBTree.tree_[droLeftNode].key_ != gccLeftKey ||
           droRBTree.tree_[droLeftNode].color_ != gccLeftNode->_M_color) {
-        throw std::logic_error("Error at Left Tree Index");
+        error_message +=
+            "Left Tree error at index: " + std::to_string(droLeftNode);
+        throw std::logic_error(error_message);
       }
       if (droRBTree.tree_[droLeftNode].parent_ != droNode) {
-        throw std::logic_error("Error at Left Tree Parent");
+        error_message += "Left Tree parent out of sync at index: " +
+                         std::to_string(droLeftNode);
+        throw std::logic_error(error_message);
       }
       traverseTree(droLeftNode, gccLeftNode);
     } else {
-      if (droLeftNode != droRBTree.empty_value_) {
-         throw std::logic_error("Sync Error at Left Tree Index");
+      if (droLeftNode != droRBTree.empty_index_) {
+        error_message += "Left Tree node should be empty at index: " +
+                         std::to_string(droLeftNode);
+        throw std::logic_error(error_message);
       }
     }
 
@@ -85,27 +97,34 @@ template <typename T> struct TreeBuilder {
       T gccRightKey =
           std::_Rb_tree<T, T, std::_Identity<T>, std::less<T>>::_S_key(
               gccRightNode);
-      // std::cout << "Right: " << gccRightKey << ' ' << gccRightNode->_M_color
-      //           << " Dro: " << droRBTree.tree_[droRightNode].data_ << " "
-      //           << droRBTree.tree_[droRightNode].color_ << '\n';
-      if (droRBTree.tree_[droRightNode].data_ != gccRightKey ||
+
+      if (droRBTree.tree_[droRightNode].key_ != gccRightKey ||
           droRBTree.tree_[droRightNode].color_ != gccRightNode->_M_color) {
-         throw std::logic_error("Error at Right Tree Index");
+        error_message +=
+            "Right Tree error at index: " + std::to_string(droRightNode);
+        throw std::logic_error(error_message);
       }
       if (droRBTree.tree_[droRightNode].parent_ != droNode) {
-        throw std::logic_error("Error at Right Tree Parent");
+        error_message += "Right Tree parent out of sync at index: " +
+                         std::to_string(droRightNode);
+        throw std::logic_error(error_message);
       }
       traverseTree(droRightNode, gccRightNode);
     } else {
-      if (droRightNode != droRBTree.empty_value_) {
-        throw std::logic_error("Sync Error at Right Tree Index");
+      if (droRightNode != droRBTree.empty_index_) {
+        error_message += "Right Tree node should be empty at index: " +
+                         std::to_string(droRightNode);
+        throw std::logic_error(error_message);
       }
     }
   }
 };
 
+}// namespace details
+}// namespace dro
+
 int main() {
-  TreeBuilder<int> rbtree;
+  dro::details::TreeBuilder<int> rbtree;
   const int loopCount = 20;
   const int maxIters  = 1000;
 
@@ -121,23 +140,15 @@ int main() {
     }
     for (int i {}; i < iters; ++i) {
       int h = randNum[i];
-      std::cout << i << ' ' << h << '\n';
       rbtree.erase(h);
     }
-    for (int i {}; i < iters; ++i) {
-      std::cout << i << '\n';
-      rbtree.erase(i);
-    }
+    for (int i {}; i < iters; ++i) { rbtree.erase(i); }
 
   } catch (std::logic_error& e) {
-    std::cerr << e.what() << "\nERROR !!!!!!!!\n\n\n";
+    std::cerr << "Test Terminated with error: " << e.what() << "\n";
+    return 1;
   }
-  std::cout << "Final Vals: \n";
-  //
-  //
-  // rbtree.print_vals();
 
-  std::cout << "Test\n";
-
+  std::cout << "Test Completed! \n";
   return 0;
 }
