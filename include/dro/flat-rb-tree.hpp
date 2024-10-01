@@ -39,14 +39,14 @@ concept FlatTree_NoThrow =
 template <typename T>
 concept Integral = std::is_integral<T>::value;
 
-struct EmptyType {};
+struct FlatSetEmptyType {};
 
-template <FlatTree_Type Key> struct PairSet {
+template <FlatTree_Type Key> struct PairFlatSet {
   Key first;
-  EmptyType second [[no_unique_address]];
-  PairSet() = default;
-  bool operator==(const PairSet& other) { return first == other.first; }
-  bool operator!=(const PairSet& other) { return ! (*this == other); }
+  FlatSetEmptyType second [[no_unique_address]];
+  PairFlatSet() = default;
+  bool operator==(const PairFlatSet& other) { return first == other.first; }
+  bool operator!=(const PairFlatSet& other) { return ! (*this == other); }
 };
 
 template <typename Pair, Integral Size = std::size_t> struct Node {
@@ -69,7 +69,7 @@ template <typename Pair, Integral Size = std::size_t> struct Node {
   bool operator!=(const Node& other) { return ! (*this == other); }
 };
 
-template <typename Container> struct Iterator {
+template <typename Container> struct FlatTreeIterator {
   using key_type          = typename Container::key_type;
   using mapped_type       = typename Container::mapped_type;
   using value_type        = typename Container::value_type;
@@ -82,16 +82,19 @@ template <typename Container> struct Iterator {
   using const_reference   = const key_type&;
   using iterator_category = std::bidirectional_iterator_tag;
 
-  explicit Iterator(Container* flatTree, size_type index, bool reverse = false)
+  explicit FlatTreeIterator(Container* flatTree, size_type index,
+                            bool reverse = false)
       : flatTree_(flatTree), index_(index), reverse_(reverse) {}
 
-  bool operator==(const Iterator& other) const {
+  bool operator==(const FlatTreeIterator& other) const {
     return other.flatTree_ == flatTree_ && other.index_ == index_ &&
            other.reverse_ == reverse_;
   }
-  bool operator!=(const Iterator& other) const { return ! (*this == other); }
+  bool operator!=(const FlatTreeIterator& other) const {
+    return ! (*this == other);
+  }
 
-  Iterator& operator++() {
+  FlatTreeIterator& operator++() {
     if (reverse_) {
       index_ = flatTree_->_prev(index_);
     } else {
@@ -100,7 +103,7 @@ template <typename Container> struct Iterator {
     return *this;
   }
 
-  Iterator& operator--() {
+  FlatTreeIterator& operator--() {
     if (reverse_) {
       index_ = flatTree_->_next(index_);
     } else {
@@ -110,56 +113,56 @@ template <typename Container> struct Iterator {
   }
 
   reference operator*() const
-    requires(std::is_same_v<mapped_type, EmptyType> &&
+    requires(std::is_same_v<mapped_type, FlatSetEmptyType> &&
              ! std::is_const_v<Container>)
   {
     return flatTree_->tree_[index_].pair_.first;
   }
 
   const_reference operator*() const
-    requires(std::is_same_v<mapped_type, EmptyType> &&
+    requires(std::is_same_v<mapped_type, FlatSetEmptyType> &&
              std::is_const_v<Container>)
   {
     return flatTree_->tree_[index_].pair_.first;
   }
 
   pointer operator->() const
-    requires(std::is_same_v<mapped_type, EmptyType> &&
+    requires(std::is_same_v<mapped_type, FlatSetEmptyType> &&
              ! std::is_const_v<Container>)
   {
     return &flatTree_->tree_[index_].pair_.first;
   }
 
   const_pointer operator->() const
-    requires(std::is_same_v<mapped_type, EmptyType> &&
+    requires(std::is_same_v<mapped_type, FlatSetEmptyType> &&
              std::is_const_v<Container>)
   {
     return &flatTree_->tree_[index_].pair_.first;
   }
 
   value_type& operator*() const
-    requires(! std::is_same_v<mapped_type, EmptyType> &&
+    requires(! std::is_same_v<mapped_type, FlatSetEmptyType> &&
              ! std::is_const_v<Container>)
   {
     return flatTree_->tree_[index_].pair_;
   }
 
   const value_type& operator*() const
-    requires(! std::is_same_v<mapped_type, EmptyType> &&
+    requires(! std::is_same_v<mapped_type, FlatSetEmptyType> &&
              std::is_const_v<Container>)
   {
     return flatTree_->tree_[index_].pair_;
   }
 
   value_type* operator->() const
-    requires(! std::is_same_v<mapped_type, EmptyType> &&
+    requires(! std::is_same_v<mapped_type, FlatSetEmptyType> &&
              ! std::is_const_v<Container>)
   {
     return &flatTree_->tree_[index_].pair_;
   }
 
   const value_type* operator->() const
-    requires(! std::is_same_v<mapped_type, EmptyType> &&
+    requires(! std::is_same_v<mapped_type, FlatSetEmptyType> &&
              std::is_const_v<Container>)
   {
     return &flatTree_->tree_[index_].pair_;
@@ -187,8 +190,8 @@ public:
   using allocator_type  = Allocator;
   using node_type       = Node<Pair, Size>;
   using self_type      = FlatRBTree<Key, Value, Pair, Size, Compare, Allocator>;
-  using iterator       = Iterator<self_type>;
-  using const_iterator = Iterator<const self_type>;
+  using iterator       = FlatTreeIterator<self_type>;
+  using const_iterator = FlatTreeIterator<const self_type>;
   using pair_iterator  = std::pair<iterator, iterator>;
   using pair_const_iterator = std::pair<const_iterator, const_iterator>;
 
@@ -257,7 +260,7 @@ public:
 
   // Element Access
   mapped_type& at(const key_type& key)
-    requires(! std::is_same_v<mapped_type, EmptyType>)
+    requires(! std::is_same_v<mapped_type, FlatSetEmptyType>)
   {
     size_type index = _find_index(key);
     if (index == empty_index_) {
@@ -267,7 +270,7 @@ public:
   }
 
   const mapped_type& at(const key_type& key) const
-    requires(! std::is_same_v<mapped_type, EmptyType>)
+    requires(! std::is_same_v<mapped_type, FlatSetEmptyType>)
   {
     size_type index = _find_index(key);
     if (index == empty_index_) {
@@ -277,7 +280,7 @@ public:
   }
 
   mapped_type& operator[](const key_type& key)
-    requires(! std::is_same_v<mapped_type, EmptyType>)
+    requires(! std::is_same_v<mapped_type, FlatSetEmptyType>)
   {
     size_type index = _find_index(key);
     if (index == empty_index_) {
@@ -287,7 +290,7 @@ public:
   }
 
   mapped_type& operator[](key_type&& key)
-    requires(! std::is_same_v<mapped_type, EmptyType>)
+    requires(! std::is_same_v<mapped_type, FlatSetEmptyType>)
   {
     size_type index = _find_index(key);
     if (index == empty_index_) {
@@ -359,25 +362,25 @@ public:
   }
 
   std::pair<iterator, bool> insert(const value_type& pair)
-    requires(! std::is_same_v<mapped_type, EmptyType>)
+    requires(! std::is_same_v<mapped_type, FlatSetEmptyType>)
   {
     return _emplace(pair.first, pair.second);
   }
 
   std::pair<iterator, bool> insert(value_type&& pair)
-    requires(! std::is_same_v<mapped_type, EmptyType>)
+    requires(! std::is_same_v<mapped_type, FlatSetEmptyType>)
   {
     return _emplace(pair.first, pair.second);
   }
 
   std::pair<iterator, bool> insert(const key_type& key)
-    requires std::is_same_v<mapped_type, EmptyType>
+    requires std::is_same_v<mapped_type, FlatSetEmptyType>
   {
     return _emplace(key);
   }
 
   std::pair<iterator, bool> insert(key_type&& key)
-    requires std::is_same_v<mapped_type, EmptyType>
+    requires std::is_same_v<mapped_type, FlatSetEmptyType>
   {
     return _emplace(key);
   }
@@ -575,7 +578,7 @@ private:
   template <typename K, typename... Args>
   std::pair<iterator, bool> _emplace(const K& key, Args&&... args)
     requires(std::is_convertible_v<K, key_type> &&
-             ! std::is_same_v<mapped_type, EmptyType> &&
+             ! std::is_same_v<mapped_type, FlatSetEmptyType> &&
              std::is_constructible_v<mapped_type, Args...>)
   {
 
@@ -609,7 +612,7 @@ private:
 
   template <typename... Args>
   std::pair<iterator, bool> _emplace(Args&&... args)
-    requires(std::is_same_v<mapped_type, EmptyType> &&
+    requires(std::is_same_v<mapped_type, FlatSetEmptyType> &&
              std::is_constructible_v<key_type, Args...>)
   {
 
@@ -650,7 +653,7 @@ private:
       if (key == parentRef.pair_.first) {
         return {parent, false};
       }
-      if (key < parentRef.pair_.first) {
+      if (key_compare()(key, parentRef.pair_.first)) {
         node = parentRef.left_;
       } else {
         node = parentRef.right_;
@@ -662,7 +665,7 @@ private:
   void _insertUpdateParentRoot(key_type key, size_type parent,
                                size_type insertIndex) {
     auto& parentRef = tree_[parent];
-    if (key < parentRef.pair_.first) {
+    if (key_compare()(key, parentRef.pair_.first)) {
       parentRef.left_ = insertIndex;
     } else {
       parentRef.right_ = insertIndex;
@@ -732,7 +735,7 @@ private:
       if (nodeRef.pair_.first == key) {
         return node;
       }
-      if (nodeRef.pair_.first < key) {
+      if (key_compare()(nodeRef.pair_.first, key)) {
         node = nodeRef.right_;
       } else {
         node = nodeRef.left_;
@@ -747,7 +750,7 @@ private:
     // Find node with binary search
     while (node != empty_index_) {
       auto& nodeRef = tree_[node];
-      if (nodeRef.pair_.first <= key) {
+      if (key_compare()(nodeRef.pair_.first, key)) {// Check <=
         node = nodeRef.right_;
       } else {
         node = nodeRef.left_;
@@ -774,7 +777,7 @@ private:
       if (nodeRef.pair_.first == key) {
         return node;
       }
-      if (nodeRef.pair_.first < key) {
+      if (key_compare()(nodeRef.pair_.first, key)) {
         node = nodeRef.right_;
       } else {
         node = nodeRef.left_;
@@ -1215,14 +1218,14 @@ public:
 template <details::FlatTree_Type Key, details::Integral Size = std::size_t,
           typename Compare = std::less<Key>,
           typename Allocator =
-              std::allocator<details::Node<details::PairSet<Key>, Size>>>
-class FlatSet
-    : public details::FlatRBTree<Key, details::EmptyType, details::PairSet<Key>,
-                                 Size, Compare, Allocator> {
+              std::allocator<details::Node<details::PairFlatSet<Key>, Size>>>
+class FlatSet : public details::FlatRBTree<Key, details::FlatSetEmptyType,
+                                           details::PairFlatSet<Key>, Size,
+                                           Compare, Allocator> {
   using size_type = Size;
   using tree_type =
-      details::FlatRBTree<Key, details::EmptyType, details::PairSet<Key>, Size,
-                          Compare, Allocator>;
+      details::FlatRBTree<Key, details::FlatSetEmptyType,
+                          details::PairFlatSet<Key>, Size, Compare, Allocator>;
 
 public:
   explicit FlatSet(size_type capacity = 1, Allocator allocator = Allocator())

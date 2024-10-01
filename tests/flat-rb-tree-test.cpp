@@ -28,7 +28,7 @@ namespace dro {
 namespace details {
 
 template <typename T> struct TreeBuilder {
-  FlatRBTree<T, EmptyType, details::PairSet<T>> droRBTree;
+  FlatRBTree<T, FlatSetEmptyType, details::PairFlatSet<T>> droRBTree;
   std::_Rb_tree<T, T, std::_Identity<T>, std::less<T>> gccRBTree;
   std::string error_message;
 
