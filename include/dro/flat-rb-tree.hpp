@@ -1191,7 +1191,11 @@ private:
 
   void _resizeTree() {
     if (size_ == capacity_) {
-      capacity_ *= 2;
+      if (capacity_ >= empty_index_ / 2) {
+        capacity_ = empty_index_;
+      } else {
+        capacity_ *= 2;
+      }
       tree_.resize(capacity_);
     }
   }
