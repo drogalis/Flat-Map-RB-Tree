@@ -8,13 +8,14 @@
 #include "dro/flat-rb-tree.hpp"
 #include <chrono>
 #include <cstdlib>
+#include <cstdint>
 #include <iostream>
 #include <random>
-#include <set>
+#include <map>
 #include <vector>
 
-#if __has_include(<boost/container/flat_set.hpp> )
-#include <boost/container/flat_set.hpp>
+#if __has_include(<boost/container/flat_map.hpp> )
+#include <boost/container/flat_map.hpp>
 #endif
 
 struct alignas(4) Test {
@@ -25,18 +26,18 @@ struct alignas(4) Test {
 };
 
 int main() {
-  int iterations = 1'000'000;
+  int iterations = 10'000;
 
   // Generate Vector of Random Ints
   std::vector<int> randInts(iterations);
   for (auto& i : randInts) { i = rand(); }
 
-  std::cout << "Dro Flat RB Tree: \n";
+  std::cout << "Dro FlatMap: \n";
 
   // Insertion Benchmark
-  dro::FlatSet<Test, int> rbTree;
+  dro::FlatMap<Test, Test, uint8_t> dro_;
   auto start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { rbTree.insert(Test(i)); }
+  for (auto i : randInts) { dro_.emplace(Test(i), Test(i)); }
   auto stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Average insertion time: "
@@ -48,7 +49,7 @@ int main() {
 
   // Find Benchmark
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { rbTree.find(Test(i)); }
+  for (auto i : randInts) { dro_.find(Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Total find time: "
@@ -59,7 +60,7 @@ int main() {
 
   // Remove Benchmark
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { rbTree.erase(Test(i)); }
+  for (auto i : randInts) { dro_.erase(Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Average Erase time: "
@@ -72,12 +73,12 @@ int main() {
 
   // ==============================================================================
 
-  std::cout << "STL Set (RB Tree): \n";
+  std::cout << "STL Map: \n";
 
   // Insertion Benchmark
-  std::set<Test> stl_rbTree;
+  std::map<Test, Test> stl_;
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { stl_rbTree.insert(Test(i)); }
+  for (auto i : randInts) { stl_.emplace(Test(i), Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Average insertion time: "
@@ -89,7 +90,7 @@ int main() {
 
   // Find Benchmark
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { stl_rbTree.count(Test(i)); }
+  for (auto i : randInts) { stl_.count(Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Total find time: "
@@ -100,7 +101,7 @@ int main() {
 
   // Remove Benchmark
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { stl_rbTree.erase(Test(i)); }
+  for (auto i : randInts) { stl_.erase(Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Average Erase time: "
@@ -110,14 +111,14 @@ int main() {
                    iterations
             << " ns.\n";
 
-#if __has_include(<boost/container/flat_set.hpp>)
+#if __has_include(<boost/container/flat_map.hpp>)
 
-  std::cout << "Boost Flat Set (RB Tree): \n";
+  std::cout << "Boost FlatMap: \n";
 
   // Insertion Benchmark
-  boost::container::flat_set<Test> boost_rbTree;
+  boost::container::flat_map<Test, Test> boost_;
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { boost_rbTree.insert(Test(i)); }
+  for (auto i : randInts) { boost_.emplace(Test(i), Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Average insertion time: "
@@ -129,7 +130,7 @@ int main() {
 
   // Find Benchmark
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { boost_rbTree.find(Test(i)); }
+  for (auto i : randInts) { boost_.find(Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Total find time: "
@@ -140,7 +141,7 @@ int main() {
 
   // Remove Benchmark
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { boost_rbTree.erase(Test(i)); }
+  for (auto i : randInts) { boost_.erase(Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Average Erase time: "
