@@ -19,12 +19,13 @@
 
 struct alignas(4) Test {
   int x_;
+  Test() = default;
   Test(int x) : x_(x) {}
   auto operator<=>(const Test&) const = default;
 };
 
 int main() {
-  int iterations = 100'000;
+  int iterations = 1'000'000;
 
   // Generate Vector of Random Ints
   std::vector<int> randInts(iterations);
@@ -33,7 +34,7 @@ int main() {
   std::cout << "Dro Flat RB Tree: \n";
 
   // Insertion Benchmark
-  dro::FlatSet<Test> rbTree;
+  dro::FlatSet<Test, int> rbTree;
   auto start = std::chrono::high_resolution_clock::now();
   for (auto i : randInts) { rbTree.insert(Test(i)); }
   auto stop = std::chrono::high_resolution_clock::now();
@@ -47,7 +48,7 @@ int main() {
 
   // Find Benchmark
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { rbTree.find_index(Test(i)); }
+  for (auto i : randInts) { rbTree.find(Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Total find time: "
@@ -58,7 +59,7 @@ int main() {
 
   // Remove Benchmark
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { rbTree.remove(Test(i)); }
+  for (auto i : randInts) { rbTree.erase(Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Average Erase time: "
@@ -114,7 +115,7 @@ int main() {
   std::cout << "Boost Flat Set (RB Tree): \n";
 
   // Insertion Benchmark
-  boost::container::flat_set<int> boost_rbTree;
+  boost::container::flat_set<Test> boost_rbTree;
   start = std::chrono::high_resolution_clock::now();
   for (auto i : randInts) { boost_rbTree.insert(Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
@@ -128,7 +129,7 @@ int main() {
 
   // Find Benchmark
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { boost_rbTree.count(Test(i)); }
+  for (auto i : randInts) { boost_rbTree.find(Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Total find time: "
