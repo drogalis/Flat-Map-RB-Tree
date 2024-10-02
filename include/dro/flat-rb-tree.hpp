@@ -8,18 +8,15 @@
 #ifndef DRO_FLAT_RED_BLACK_TREE
 #define DRO_FLAT_RED_BLACK_TREE
 
-#include <algorithm>
-#include <charconv>
-#include <climits>
-#include <concepts>
-#include <cstddef>
-#include <iterator>
-#include <limits>
-#include <stdexcept>
-#include <type_traits>
-#include <unistd.h>
-#include <utility>
-#include <vector>
+#include <concepts>   // for requires
+#include <cstddef>    // for size_t, ptrdiff_t
+#include <functional> // for less
+#include <iterator>   // for pair, bidirectional_iterator_tag
+#include <limits>     // for numeric_limits
+#include <stdexcept>  // for out_of_range, runtime_error
+#include <type_traits>// for std::is_default_constructible
+#include <utility>    // for pair, forward
+#include <vector>     // for vector, allocator
 
 namespace dro {
 
@@ -224,12 +221,7 @@ private:
 
 public:
   explicit FlatRBTree(size_type capacity = 1, Allocator allocator = Allocator())
-      : capacity_(capacity), tree_(capacity_, allocator) {
-    if (capacity_ == empty_index_) {
-      throw std::invalid_argument("Capacity exceeds max capacity of size type. "
-                                  "Increase size type of tree.");
-    }
-  }
+      : capacity_(capacity), tree_(capacity_, allocator) {}
 
   // No memory allocated, this is redundant
   ~FlatRBTree()                            = default;
@@ -343,10 +335,7 @@ public:
 
   [[nodiscard]] size_type capacity() const noexcept { return capacity_; }
 
-  void reserve(size_type new_cap) {
-    tree_.reserve(new_cap);
-    capacity_ = tree_.capacity();
-  }
+  void reserve(size_type new_cap) { _resizeTree(new_cap); }
 
   void shrink_to_fit() {
     while (capacity_ > size_) {
@@ -750,7 +739,8 @@ private:
     // Find node with binary search
     while (node != empty_index_) {
       auto& nodeRef = tree_[node];
-      if (key_compare()(nodeRef.pair_.first, key)) {// Check <=
+      if (key_compare()(nodeRef.pair_.first, key) ||
+          nodeRef.pair_.first == key) {
         node = nodeRef.right_;
       } else {
         node = nodeRef.left_;
@@ -758,8 +748,10 @@ private:
           return lastNode;
         }
         auto& newNodeRef = tree_[node];
-        if (lastNode != empty_index_ && newNodeRef.pair_.first <= key &&
-            tree_[lastNode].pair_.first > key) {
+        if (lastNode != empty_index_ &&
+            (key_compare()(newNodeRef.pair_.first, key) ||
+             newNodeRef.pair_.first == key) &&
+            ! (key_compare()(tree_[lastNode].pair_.first, key))) {
           return lastNode;
         }
       }
@@ -785,8 +777,10 @@ private:
           return lastNode;
         }
         auto& newNodeRef = tree_[node];
-        if (lastNode != empty_index_ && newNodeRef.pair_.first < key &&
-            tree_[lastNode].pair_.first >= key) {
+        if (lastNode != empty_index_ &&
+            key_compare()(newNodeRef.pair_.first, key) &&
+            (! key_compare()(tree_[lastNode].pair_.first, key) ||
+             tree_[lastNode].pair_.first == key)) {
           return lastNode;
         }
       }
@@ -1189,7 +1183,10 @@ private:
     }
   }
 
-  void _resizeTree() {
+  void _resizeTree(size_type new_cap = 0) {
+    if (new_cap > capacity_) {
+      tree_.resize(capacity_);
+    }
     if (size_ == capacity_) {
       if (capacity_ >= empty_index_ / 2) {
         capacity_ = empty_index_;
