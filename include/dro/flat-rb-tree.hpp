@@ -386,7 +386,7 @@ public:
   }
 
   iterator erase(const_iterator pos) {
-    key_type key = tree_[pos.index_].key_;
+    key_type key = tree_[pos.index_].pair_.first;
     _erase(key);
     return upper_bound(key);
   }
@@ -394,7 +394,7 @@ public:
   iterator erase(iterator first, iterator last) {
     key_type key;
     for (; first != last; ++first) {
-      key = tree_[first.index_].key_;
+      key = tree_[first.index_].pair_.first;
       _erase(key);
     }
     return upper_bound(key);
@@ -403,7 +403,7 @@ public:
   iterator erase(const_iterator first, const_iterator last) {
     key_type key;
     for (; first != last; ++first) {
-      key = tree_[first.index_].key_;
+      key = tree_[first.index_].pair_.first;
       _erase(key);
     }
     return upper_bound(key);
@@ -661,53 +661,44 @@ private:
     }
   }
 
-  // NEEDS TO BE REFACTORED
   bool _erase(key_type key) {
-    size_type matched_index = _find_index(key);
-
-    if (matched_index == empty_index_) {
+    size_type matchedIndex = _find_index(key);
+    if (matchedIndex == empty_index_) {
       return false;
     }
-
-    auto& matchedRef = tree_[matched_index];
+    auto& matchedRef = tree_[matchedIndex];
     bool color       = matchedRef.color_;
     size_type parent = matchedRef.parent_;
     size_type child  = empty_index_;
-
+    // One or both children empty
     if (matchedRef.left_ == empty_index_ || matchedRef.right_ == empty_index_) {
       if (matchedRef.left_ == empty_index_) {
         child = matchedRef.right_;
       } else {
         child = matchedRef.left_;
       }
-      if (child != empty_index_) {
-        tree_[child].parent_ = matchedRef.parent_;
-      }
-      _updateParentChild(child, parent, matched_index);
-      _swapOutOfTree(child, matched_index, child, parent);
+      _updateParent(child, matchedRef.parent_);
+      _updateParentChild(child, parent, matchedIndex);
+      _swapOutOfTree(child, matchedIndex, child, parent);
+      // Both children full
     } else {
-      size_type minNode = _minValueNode(matched_index);
-      child             = tree_[minNode].right_;
-      parent            = tree_[minNode].parent_;
-      color             = tree_[minNode].color_;
-
-      if (child != empty_index_) {
-        tree_[child].parent_ = parent;
-      }
-      if (parent == matched_index) {
+      size_type minNode = _minValueNode(matchedIndex);
+      auto& minNodeRef  = tree[minNode];
+      child             = minNodeRef.right_;
+      parent            = minNodeRef.parent_;
+      color             = minNodeRef.color_;
+      _updateParent(child, parent);
+      if (parent == matchedIndex) {
         tree_[parent].right_ = child;
         parent               = minNode;
       } else {
         tree_[parent].left_ = child;
       }
-      _transferData(minNode, matched_index);
-      _updateParentChild(minNode, matchedRef.parent_, matched_index);
-
+      _transferData(minNode, matchedIndex);
+      _updateParentChild(minNode, matchedRef.parent_, matchedIndex);
       tree_[matchedRef.left_].parent_ = minNode;
-      if (matchedRef.right_ != empty_index_) {
-        tree_[matchedRef.right_].parent_ = minNode;
-      }
-      _swapOutOfTree(minNode, matched_index, child, parent);
+      _updateParent(matchedRef.right_, minNode);
+      _swapOutOfTree(minNode, matchedIndex, child, parent);
     }
     if (color == BLACK_) {
       _fixErase(child, parent);
@@ -731,6 +722,12 @@ private:
       }
     }
     return empty_index_;
+  }
+
+  void _updateParent(size_type node, size_type newParent) {
+    if (node != empty_index_) {
+      tree_[node].parent_ = newParent;
+    }
   }
 
   size_type _greaterThan(key_type key) const {
@@ -818,11 +815,10 @@ private:
     size_type parent;
     while ((parent = tree_[node].parent_) && parent != empty_index_ &&
            tree_[parent].color_ == RED_) {
-
       auto& parentRef       = tree_[parent];
       size_type grandparent = parentRef.parent_;
       auto& grandparentRef  = tree_[grandparent];
-
+      // Left Tree Insert
       if (parent == grandparentRef.left_) {
         size_type uncle = grandparentRef.right_;
         auto& uncleRef  = tree_[uncle];
@@ -841,6 +837,7 @@ private:
           std::swap(parentRef.color_, grandparentRef.color_);
           node = parent;
         }
+        // Right Tree Insert
       } else {
         size_type uncle = grandparentRef.left_;
         auto& uncleRef  = tree_[uncle];
@@ -878,10 +875,9 @@ private:
     size_type sibling = empty_index_;
     while (node != root_ &&
            (node == empty_index_ || tree_[node].color_ == BLACK_)) {
-
       auto& nodeRef   = tree_[node];
       auto& parentRef = tree_[parent];
-
+      // Left Tree Erase
       if (node == parentRef.left_) {
         sibling = parentRef.right_;
         if (tree_[sibling].color_ == RED_) {
@@ -917,6 +913,7 @@ private:
           node = root_;
           break;
         }
+        // Right Tree Erase
       } else {
         size_type sibling = parentRef.left_;
         if (tree_[sibling].color_ == RED_) {
@@ -1022,7 +1019,6 @@ private:
     auto& nodeARightRef   = tree_[nodeARight];
     auto& nodeBLeftRef    = tree_[nodeBLeft];
     auto& nodeBRightRef   = tree_[nodeBRight];
-
     // Swap Parent Index
     if (nodeAParent != empty_index_) {
       if (nodeAParentRef.left_ == nodeA) {
@@ -1091,7 +1087,6 @@ private:
     auto& nodeAParentRef  = tree_[nodeAParent];
     auto& nodeALeftRef    = tree_[nodeALeft];
     auto& nodeARightRef   = tree_[nodeARight];
-
     // Swap Parent Index
     if (nodeAParent != empty_index_) {
       if (nodeAParentRef.left_ == nodeA) {
