@@ -1,4 +1,176 @@
-# Flat Red Black Tree
+# Flat Map RB Tree
+
+A STL compliant map and set that uses a red black tree under the hood. Much faster than [boost::flat_map]() for any workload over ~250 elements.
+Beats std::map with full optimizations enabled, see [benchmarks](#Benchmarks).
+
+## Implementation
+
+This flat map uses a vector to store the tree nodes, and maintains an approximate heap structure for a cache optimized binary search. In
+order to validate the correctness of the balancing algorithm, a full tree traversal is performed comparing the flat map to the STL Tree implementation.
+
+## Usage
+
+Some points to note:
+
+- The key and value must be default constructible.
+- The biggest limitation compared to std::map is the iterators are invalidated on all modifying operations.
+- Memory isn't deallocated on erase.
+
+#### Constructor
+
+- `FlatMap<Key, Value, Size> flatMap(size_type capacity = 1, Allocator allocator = Allocator());`
+
+- `FlatMap<Key, Size> flatSet(size_type capacity = 1, Allocator allocator = Allocator());`
+
+  The 'Size' parameter is any integral type. In order to optimize for space efficiency, select the size that can store the maximum number of elements required.
+  An extra slot is needed to represent an empty value.
+
+  | Type               | Max Capacity               |
+  | ------------------ | -------------------------- |
+  | uint8_t            | 255                        |
+  | uint16_t           | 65,535                     |
+  | uint32_t           | 4,294,967,295              |
+  | uint64_t (default) | 18,446,744,073,709,551,615 |
+
+#### Element Access
+
+- `mapped_type& at(const key_type& key);`
+
+  **Map Only**: Throws std::out_of_range if element doesn't exist.
+
+- `mapped_type& operator[](const key_type& key);`
+
+  **Map Only**: Inserts new element if element doesn't exist.
+
+#### Iterators
+
+- `iterator begin();`
+
+  Returns iterator to the first element in sorted order.
+
+- `const_iterator cbegin() const noexcept;`
+
+  Returns constant iterator to the first element in sorted order.
+
+- `iterator end();`
+
+  Returns iterator to one past the last element.
+
+- `const_iterator cend() const noexcept;`
+
+  Returns constant iterator to one past the last element.
+
+- `iterator rbegin();`
+
+  Returns iterator to the last element in sorted order.
+
+- `const_iterator crbegin() const noexcept;`
+
+  Returns constant iterator to the last element in sorted order.
+
+- `iterator rend();`
+
+  Returns iterator to one past the first element.
+
+- `const_iterator crend() const noexcept;`
+
+  Returns constant iterator to one past the first element.
+
+#### Capacity
+
+- `[[nodiscard]] bool empty() const noexcept;`
+
+  Checks whether the container is empty.
+
+- `[[nodiscard]] size_type size() const noexcept;`
+
+  Returns the number of elements in the container.
+
+- `[[nodiscard]] size_type max_size() const noexcept;`
+
+  Returns the maximum possible number of elements.
+
+- `[[nodiscard]] size_type capacity() const noexcept;`
+
+  Returns the number of elements that have been allocated.
+
+- `void reserve(size_type new_cap);`
+
+  Reserves additional space for the number of elements specified.
+
+- `void shrink_to_fit();`
+
+  Deallocates all erased elements and shrinks the capacity to equal the size.
+
+#### Modifiers
+
+- `void clear() noexcept;`
+
+  Sets the size to zero.
+
+- `std::pair<iterator, bool> insert(const value_type& pair);`
+
+  **Map Only**: Inserts key value pair into map.
+
+- `std::pair<iterator, bool> insert(const key_type& key);`
+
+  **Set Only**: Inserts key into set.
+
+- `std::pair<iterator, bool> emplace(Args&&... args);`
+
+  Constructs value in place for map and key in place for set.
+
+- `size_type erase(const key_type& key);`
+
+  Erases element from container, and does NOT deallocate memory.
+
+- `void swap(self_type& other) noexcept;`
+
+  Swaps the contents of two containers.
+
+- `node_type extract(const key_type& key);`
+
+  Extracts the node from the container.
+
+- `void merge(self_type& source);`
+
+  Merges the contents of one container into another.
+
+#### Lookup
+
+- `[[nodiscard]] size_type count(const key_type& key) const;`
+
+  Returns the number of elements matching a specific key.
+
+- `[[nodiscard]] iterator find(const key_type& key);`
+
+  Returns an iterator to the element that matches the specific key. Returns end() if doesn't exist.
+
+- `[[nodiscard]] bool contains(const key_type& key) const;`
+
+  Checks if the specific key exists in the container.
+
+- `[[nodiscard]] pair_iterator equal_range(const key_type& key);`
+
+  Returns a range of elements matching a specific key.
+
+- `[[nodiscard]] iterator lower_bound(const key_type& key);`
+
+  Returns an iterator to the first element not less than the given key.
+
+- `[[nodiscard]] iterator upper_bound(const key_type& key);`
+
+  Returns an iterator to the first element greater than the given key.
+
+#### Observers
+
+- `[[nodiscard]] Compare key_comp() const noexcept;`
+
+  Returns the function that compares keys.
+
+- `[[nodiscard]] Compare value_comp() const noexcept;`
+
+  Returns the function that compares keys in object of type value_type.
 
 ## Benchmarks
 
