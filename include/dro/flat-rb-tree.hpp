@@ -683,7 +683,7 @@ private:
       // Both children full
     } else {
       size_type minNode = _minValueNode(matchedIndex);
-      auto& minNodeRef  = tree[minNode];
+      auto& minNodeRef  = tree_[minNode];
       child             = minNodeRef.right_;
       parent            = minNodeRef.parent_;
       color             = minNodeRef.color_;
@@ -809,53 +809,39 @@ private:
     }
   }
 
-  // THE RB TREE LOGIC IS COMPLEX
-  // NEEDS TO BE REFACTORED
   void _fixInsert(size_type node) {
-    size_type parent;
-    while ((parent = tree_[node].parent_) && parent != empty_index_ &&
-           tree_[parent].color_ == RED_) {
+    while (node != root_ && tree_[tree_[node].parent_].color_ == RED_) {
+      size_type parent      = tree_[node].parent_;
       auto& parentRef       = tree_[parent];
       size_type grandparent = parentRef.parent_;
       auto& grandparentRef  = tree_[grandparent];
-      // Left Tree Insert
-      if (parent == grandparentRef.left_) {
-        size_type uncle = grandparentRef.right_;
-        auto& uncleRef  = tree_[uncle];
-        if (uncle != empty_index_ && uncleRef.color_ == RED_) {
-          _updateInsertColors(uncleRef, parentRef, grandparentRef);
-          node = grandparent;
-        } else {
-          if (uncle != empty_index_) {
-            _swapNodePosition(uncle, node);
-            node = uncle;
-          }
+      size_type uncle = (parent == grandparentRef.left_) ? grandparentRef.right_
+                                                         : grandparentRef.left_;
+      auto& uncleRef  = tree_[uncle];
+      // Update Uncle
+      if (uncle != empty_index_ && uncleRef.color_ == RED_) {
+        _updateInsertColors(uncleRef, parentRef, grandparentRef);
+        node = grandparent;
+      } else {
+        if (uncle != empty_index_) {
+          _swapNodePosition(uncle, node);
+          node = uncle;
+        }
+        if (parent == grandparentRef.left_) {
+          // Left Tree Insert
           if (node == parentRef.right_) {
             _rotateLeft(parent);
           }
           _rotateRight(grandparent);
-          std::swap(parentRef.color_, grandparentRef.color_);
-          node = parent;
-        }
-        // Right Tree Insert
-      } else {
-        size_type uncle = grandparentRef.left_;
-        auto& uncleRef  = tree_[uncle];
-        if (uncle != empty_index_ && uncleRef.color_ == RED_) {
-          _updateInsertColors(uncleRef, parentRef, grandparentRef);
-          node = grandparent;
         } else {
-          if (uncle != empty_index_) {
-            _swapNodePosition(uncle, node);
-            node = uncle;
-          }
+          // Right Tree Insert
           if (node == parentRef.left_) {
             _rotateRight(parent);
           }
           _rotateLeft(grandparent);
-          std::swap(parentRef.color_, grandparentRef.color_);
-          node = parent;
         }
+        std::swap(parentRef.color_, grandparentRef.color_);
+        node = parent;
       }
     }
     tree_[root_].color_ = BLACK_;
