@@ -1,11 +1,19 @@
 # Flat Map RB Tree
 
-A STL compliant map and set that uses a red black tree under the hood. Much faster than [boost::flat_map]() for any workload over ~250 elements.
-Beats std::map with full optimizations enabled, see [benchmarks](#Benchmarks).
+A STL compliant map and set that uses a red black tree under the hood. Much faster than [boost::flat_map](https://www.boost.org/doc/libs/1_76_0/boost/container/flat_map.hpp) for any workload over ~250 elements.
+Beats std::map with full optimizations enabled.
+
+## Table of Contents
+
+- [Implementation](#Implementation)
+- [Usage](#Usage)
+- [Benchmarks](#Benchmarks)
+- [Installing](#Installing)
+- [License](#License)
 
 ## Implementation
 
-This flat map uses a vector to store the tree nodes, and maintains an approximate heap structure for a cache optimized binary search. In
+This flat map uses a vector to store the tree nodes, and maintains an approximate [heap](https://en.wikipedia.org/wiki/Heap_(data_structure)#:~:text=In%20computer%20science%2C%20a%20heap,The%20node%20at%20the%20%22top%22) structure for a cache optimized [binary search](https://en.wikipedia.org/wiki/Binary_search#:~:text=Binary%20search%20compares%20the%20target,the%20target%20value%20is%20found.). In
 order to validate the correctness of the balancing algorithm, a full tree traversal is performed comparing the flat map to the STL Tree implementation.
 
 ## Usage
