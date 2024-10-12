@@ -26,12 +26,12 @@ Some points to note:
 
 #### Constructor
 
-- `FlatMap<Key, Value, Size> flatMap(size_type capacity = 1, Allocator allocator = Allocator());`
+- `FlatMap<Key, Value, MaxSize> flatMap(size_type capacity = 1, Allocator allocator = Allocator());`
 
-- `FlatSet<Key, Size> flatSet(size_type capacity = 1, Allocator allocator = Allocator());`
+- `FlatSet<Key, MaxSize> flatSet(size_type capacity = 1, Allocator allocator = Allocator());`
 
-  The 'Size' parameter is any integral type. In order to optimize for space efficiency, select the size that can store the maximum number of elements required.
-  An extra slot is needed to represent an empty value.
+  The 'MaxSize' parameter is any integral type. In order to optimize for space efficiency, select the size that can store the maximum number of elements required.
+  An extra slot is needed to represent an empty index.
 
   | Type               | Max Capacity               |
   | ------------------ | -------------------------- |
