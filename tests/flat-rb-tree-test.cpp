@@ -23,12 +23,10 @@
 #include "flat-set-test.hpp"
 #include "stl_tree_public.h"
 
-namespace dro {
-
-namespace details {
+namespace dro::details {
 
 template <typename T> struct TreeBuilder {
-  FlatRBTree<T, FlatSetEmptyType, details::PairFlatSet<T>> droRBTree;
+  FlatRBTree<T, FlatSetEmptyType, details::FlatSetPair<T>> droRBTree;
   std::_Rb_tree<T, T, std::_Identity<T>, std::less<T>> gccRBTree;
   std::string error_message;
 
@@ -45,85 +43,86 @@ template <typename T> struct TreeBuilder {
   }
 
   void validateTree() {
-    auto gccRoot = gccRBTree._M_root();
     auto droRoot = droRBTree.root_;
+    auto gccRoot = gccRBTree._M_root();
     if (gccRoot) {
       T gccRootKey =
           std::_Rb_tree<T, T, std::_Identity<T>, std::less<T>>::_S_key(gccRoot);
+      // Confirm tree roots are equal
       if (droRBTree.tree_[droRoot].pair_.first != gccRootKey ||
           droRBTree.tree_[droRoot].color_ != gccRoot->_M_color) {
-        throw std::logic_error("Tree Roots out of sync");
+        throw std::logic_error("Tree root out of sync");
       }
       if (droRBTree.tree_[droRoot].parent_ != droRBTree.empty_index_) {
-        throw std::logic_error("Tree Roots Parent out of sync");
+        throw std::logic_error("Tree root parent out of sync");
       }
       traverseTree(droRoot, gccRoot);
     } else {
       if (droRoot != droRBTree.empty_index_) {
-        throw std::logic_error("Tree Root should be empty_index");
+        throw std::logic_error("Dro tree root should be empty_index");
       }
     }
   }
 
   void traverseTree(auto droNode, auto gccNode) {
-    auto gccLeftNode = gccNode->_M_left;
+    // Left Tree
     auto droLeftNode = droRBTree.tree_[droNode].left_;
-
+    auto gccLeftNode = gccNode->_M_left;
     if (gccLeftNode) {
       T gccLeftKey =
           std::_Rb_tree<T, T, std::_Identity<T>, std::less<T>>::_S_key(
               gccLeftNode);
-
+      // Confirm left tree nodes are equal
       if (droRBTree.tree_[droLeftNode].pair_.first != gccLeftKey ||
           droRBTree.tree_[droLeftNode].color_ != gccLeftNode->_M_color) {
         error_message +=
-            "Left Tree error at index: " + std::to_string(droLeftNode);
+            "Left tree out of sync at index: " + std::to_string(droLeftNode);
         throw std::logic_error(error_message);
       }
       if (droRBTree.tree_[droLeftNode].parent_ != droNode) {
-        error_message += "Left Tree parent out of sync at index: " +
+        error_message += "Left tree parent out of sync at index: " +
                          std::to_string(droLeftNode);
         throw std::logic_error(error_message);
       }
       traverseTree(droLeftNode, gccLeftNode);
     } else {
       if (droLeftNode != droRBTree.empty_index_) {
-        error_message += "Left Tree node should be empty at index: " +
+        error_message += "Left tree node should be empty_index_ at index: " +
                          std::to_string(droLeftNode);
         throw std::logic_error(error_message);
       }
     }
-
-    auto gccRightNode = gccNode->_M_right;
+    // Right Tree
     auto droRightNode = droRBTree.tree_[droNode].right_;
-
+    auto gccRightNode = gccNode->_M_right;
     if (gccRightNode) {
       T gccRightKey =
           std::_Rb_tree<T, T, std::_Identity<T>, std::less<T>>::_S_key(
               gccRightNode);
-
+      // Confirm right tree nodes are equal
       if (droRBTree.tree_[droRightNode].pair_.first != gccRightKey ||
           droRBTree.tree_[droRightNode].color_ != gccRightNode->_M_color) {
         error_message +=
-            "Right Tree error at index: " + std::to_string(droRightNode);
+            "Right tree out of sync at index: " + std::to_string(droRightNode);
         throw std::logic_error(error_message);
       }
       if (droRBTree.tree_[droRightNode].parent_ != droNode) {
-        error_message += "Right Tree parent out of sync at index: " +
+        error_message += "Right tree parent out of sync at index: " +
                          std::to_string(droRightNode);
         throw std::logic_error(error_message);
       }
       traverseTree(droRightNode, gccRightNode);
     } else {
       if (droRightNode != droRBTree.empty_index_) {
-        error_message += "Right Tree node should be empty at index: " +
+        error_message += "Right tree node should be empty_index_ at index: " +
                          std::to_string(droRightNode);
         throw std::logic_error(error_message);
       }
     }
   }
 
-  void sortTest(std::vector<std::size_t> randNum, int iters) {
+  void validateSortedTree(std::vector<std::size_t> randNum, int iters) {
+    // This emplace is to add the inorder elements on top of random elements
     for (int i {}; i < iters; ++i) { randNum.emplace_back(i); }
     std::sort(randNum.begin(), randNum.end());
     int i {};
@@ -136,32 +135,30 @@ template <typename T> struct TreeBuilder {
   }
 };
 
-}// namespace details
-}// namespace dro
+}// namespace dro::details
 
 int main() {
   {
-    dro::details::TreeBuilder<int> rbtree;
-    const int loopCount = 20;
-    const int maxIters  = 1000;
+    dro::details::TreeBuilder<int> rbTree;
+    std::cout << "Starting Tree Traversal Test... Runtime ~10 seconds.\n";
 
-    const int iters = 5000;
+    const int iters = 10'000;
     std::vector<std::size_t> randNum(iters, 0);
-
+    // Tree Functional Test
     try {
-      for (int i {}; i < iters; ++i) { rbtree.insert(i); }
+      for (int i {}; i < iters; ++i) { rbTree.insert(i); }
       for (int i {}; i < iters; ++i) {
-        int h = rand();
-        rbtree.insert(h);
-        randNum[i] = h;
+        int rd = rand();
+        rbTree.insert(rd);
+        randNum[i] = rd;
       }
-      rbtree.sortTest(randNum, iters);
+      rbTree.validateSortedTree(randNum, iters);
       for (int i {}; i < iters; ++i) {
-        int h = randNum[i];
-        rbtree.erase(h);
+        int rd = randNum[i];
+        rbTree.erase(rd);
       }
-      for (int i {}; i < iters; ++i) { rbtree.erase(i); }
-
+      for (int i {}; i < iters; ++i) { rbTree.erase(i); }
+    // Print Error and Terminate
     } catch (std::logic_error& e) {
       std::cerr << "Test Terminated with error: " << e.what() << "\n";
       return 1;
@@ -169,7 +166,7 @@ int main() {
   }
 
   // FlatSet
-  testSet();
+  runFlatSetTests();
 
   // Constructors
   {
@@ -360,7 +357,7 @@ int main() {
       flatmap.at(2);
       assert(false);// Should never reach
     } catch (std::out_of_range& e) {
-      assert(true);// Should always reach;
+      assert(true);// Should always reach
     } catch (...) {
       assert(false);// Should never reach
     }
@@ -368,7 +365,7 @@ int main() {
       cflatmap.at(2);
       assert(false);// Should never reach
     } catch (std::out_of_range& e) {
-      assert(true);// Should always reach;
+      assert(true);// Should always reach
     } catch (...) {
       assert(false);// Should never reach
     }

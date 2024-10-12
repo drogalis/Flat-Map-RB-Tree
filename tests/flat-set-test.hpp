@@ -17,7 +17,7 @@
 #include <string>
 #include <vector>
 
-void testSet() {
+void runFlatSetTests() {
 
   // Iterators
   {

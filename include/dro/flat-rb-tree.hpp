@@ -8,6 +8,7 @@
 #ifndef DRO_FLAT_RED_BLACK_TREE
 #define DRO_FLAT_RED_BLACK_TREE
 
+#include <algorithm>  // for std::min
 #include <concepts>   // for requires
 #include <cstddef>    // for size_t, ptrdiff_t
 #include <functional> // for less
@@ -24,7 +25,7 @@ namespace details {
 
 template <typename T>
 concept FlatTree_Type =
-    std::is_default_constructible<T>::value &&
+    std::is_default_constructible_v<T> &&
     (std::is_move_assignable_v<T> || std::is_copy_assignable_v<T>);
 
 template <typename T, typename... Args>
@@ -34,20 +35,22 @@ concept FlatTree_NoThrow =
      (std::is_nothrow_move_assignable_v<T> && std::is_move_assignable_v<T>));
 
 template <typename T>
-concept Integral = std::is_integral<T>::value;
+concept Integral = std::is_integral_v<T>;
 
 struct FlatSetEmptyType {};
 
-template <FlatTree_Type Key> struct PairFlatSet {
+template <FlatTree_Type Key> struct FlatSetPair {
   Key first;
   FlatSetEmptyType second [[no_unique_address]];
-  PairFlatSet() = default;
-  bool operator==(const PairFlatSet& other) { return first == other.first; }
-  bool operator!=(const PairFlatSet& other) { return ! (*this == other); }
+  FlatSetPair() = default;
+  bool operator==(const FlatSetPair& other) { return first == other.first; }
+  bool operator!=(const FlatSetPair& other) { return ! (*this == other); }
 };
 
 template <typename Pair, Integral Size = std::size_t> struct Node {
   using size_type = Size;
+  // This empty_index_ definition goes against DRY. Not sure most elegant
+  // solution that also enforces correctness
   constexpr static size_type empty_index_ =
       std::numeric_limits<size_type>::max();
 
@@ -189,8 +192,6 @@ public:
   using self_type      = FlatRBTree<Key, Value, Pair, Size, Compare, Allocator>;
   using iterator       = FlatTreeIterator<self_type>;
   using const_iterator = FlatTreeIterator<const self_type>;
-  using pair_iterator  = std::pair<iterator, iterator>;
-  using pair_const_iterator = std::pair<const_iterator, const_iterator>;
 
 private:
   // Constants
@@ -425,17 +426,13 @@ public:
 
   node_type extract(const_iterator position) { return tree_[position.index_]; }
 
-  node_type extract(const key_type& key) {
-    size_type index = _find_index(key);
-    return tree_[index];
-  }
+  node_type extract(const key_type& key) { return tree_[_find_index(key)]; }
 
   template <typename K>
   node_type extract(K&& x)
     requires std::is_convertible_v<K, key_type>
   {
-    size_type index = _find_index(x);
-    return tree_[index];
+    return tree_[_find_index(x)];
   }
 
   void merge(self_type& source) {
@@ -495,27 +492,27 @@ public:
     return _find_index(x) != empty_index_;
   }
 
-  [[nodiscard]] pair_iterator equal_range(const key_type& key) {
-    return std::pair<iterator, iterator>(lower_bound(key), upper_bound(key));
+  [[nodiscard]] std::pair<iterator, iterator> equal_range(const key_type& key) {
+    return {lower_bound(key), upper_bound(key)};
   }
 
-  [[nodiscard]] pair_const_iterator equal_range(const key_type& key) const {
-    return std::pair<const_iterator, const_iterator>(lower_bound(key),
-                                                     upper_bound(key));
+  [[nodiscard]] std::pair<const_iterator, const_iterator>
+  equal_range(const key_type& key) const {
+    return {lower_bound(key), upper_bound(key)};
   }
 
   template <typename K>
-  [[nodiscard]] pair_iterator equal_range(const K& x)
+  [[nodiscard]] std::pair<iterator, iterator> equal_range(const K& x)
     requires std::is_convertible_v<K, key_type>
   {
-    return std::pair<iterator, iterator>(lower_bound(x), upper_bound(x));
+    return {lower_bound(x), upper_bound(x)};
   }
   template <typename K>
-  [[nodiscard]] pair_const_iterator equal_range(const K& x) const
+  [[nodiscard]] std::pair<const_iterator, const_iterator>
+  equal_range(const K& x) const
     requires std::is_convertible_v<K, key_type>
   {
-    return std::pair<const_iterator, const_iterator>(lower_bound(x),
-                                                     upper_bound(x));
+    return {lower_bound(x), upper_bound(x)};
   }
 
   [[nodiscard]] iterator lower_bound(const key_type& key) {
@@ -564,13 +561,13 @@ public:
   [[nodiscard]] Compare value_comp() const noexcept { return Compare(); }
 
 private:
+  // For FlatMap
   template <typename K, typename... Args>
   std::pair<iterator, bool> _emplace(const K& key, Args&&... args)
     requires(std::is_convertible_v<K, key_type> &&
              ! std::is_same_v<mapped_type, FlatSetEmptyType> &&
              std::is_constructible_v<mapped_type, Args...>)
   {
-
     _validateSize();
     size_type insertIndex = size_;
     auto insertResult     = _findInsertLocation(key);
@@ -599,12 +596,12 @@ private:
     return {iterator(this, _find_index(key)), true};
   }
 
+  // Overload For FlatSet
   template <typename... Args>
   std::pair<iterator, bool> _emplace(Args&&... args)
     requires(std::is_same_v<mapped_type, FlatSetEmptyType> &&
              std::is_constructible_v<key_type, Args...>)
   {
-
     _validateSize();
     size_type insertIndex = size_;
     key_type key          = key_type(std::forward<Args...>(args)...);
@@ -634,11 +631,12 @@ private:
   }
 
   std::pair<size_type, bool> _findInsertLocation(key_type key) {
-    size_type parent = empty_index_;
     size_type node   = root_;
+    size_type parent = empty_index_;
     while (node != empty_index_) {
       parent          = node;
       auto& parentRef = tree_[parent];
+      // Key found
       if (key == parentRef.pair_.first) {
         return {parent, false};
       }
@@ -662,43 +660,43 @@ private:
   }
 
   bool _erase(key_type key) {
-    size_type matchedIndex = _find_index(key);
-    if (matchedIndex == empty_index_) {
+    size_type eraseIndex = _find_index(key);
+    if (eraseIndex == empty_index_) {
       return false;
     }
-    auto& matchedRef = tree_[matchedIndex];
-    bool color       = matchedRef.color_;
-    size_type parent = matchedRef.parent_;
+    auto& eraseRef   = tree_[eraseIndex];
+    bool color       = eraseRef.color_;
+    size_type parent = eraseRef.parent_;
     size_type child  = empty_index_;
     // One or both children empty
-    if (matchedRef.left_ == empty_index_ || matchedRef.right_ == empty_index_) {
-      if (matchedRef.left_ == empty_index_) {
-        child = matchedRef.right_;
+    if (eraseRef.left_ == empty_index_ || eraseRef.right_ == empty_index_) {
+      if (eraseRef.left_ == empty_index_) {
+        child = eraseRef.right_;
       } else {
-        child = matchedRef.left_;
+        child = eraseRef.left_;
       }
-      _updateParent(child, matchedRef.parent_);
-      _updateParentChild(child, parent, matchedIndex);
-      _swapOutOfTree(child, matchedIndex, child, parent);
+      _updateParent(child, eraseRef.parent_);
+      _updateParentChild(child, parent, eraseIndex);
+      _swapOutOfTree(child, eraseIndex, child, parent);
       // Both children full
     } else {
-      size_type minNode = _minValueNode(matchedIndex);
+      size_type minNode = _minValueNode(eraseIndex);
       auto& minNodeRef  = tree_[minNode];
       child             = minNodeRef.right_;
       parent            = minNodeRef.parent_;
       color             = minNodeRef.color_;
       _updateParent(child, parent);
-      if (parent == matchedIndex) {
+      if (parent == eraseIndex) {
         tree_[parent].right_ = child;
         parent               = minNode;
       } else {
         tree_[parent].left_ = child;
       }
-      _transferData(minNode, matchedIndex);
-      _updateParentChild(minNode, matchedRef.parent_, matchedIndex);
-      tree_[matchedRef.left_].parent_ = minNode;
-      _updateParent(matchedRef.right_, minNode);
-      _swapOutOfTree(minNode, matchedIndex, child, parent);
+      _transferData(minNode, eraseIndex);
+      _updateParentChild(minNode, eraseRef.parent_, eraseIndex);
+      tree_[eraseRef.left_].parent_ = minNode;
+      _updateParent(eraseRef.right_, minNode);
+      _swapOutOfTree(minNode, eraseIndex, child, parent);
     }
     if (color == BLACK_) {
       _fixErase(child, parent);
@@ -796,16 +794,16 @@ private:
   }
 
   void _updateParentChild(size_type child, size_type parent,
-                          size_type matched_key) {
-    if (parent != empty_index_) {
-      auto& parentRef = tree_[parent];
-      if (parentRef.left_ == matched_key) {
-        parentRef.left_ = child;
-      } else {
-        parentRef.right_ = child;
-      }
-    } else {
+                          size_type eraseIndex) {
+    if (parent == empty_index_) {
       root_ = child;
+      return;
+    }
+    auto& parentRef = tree_[parent];
+    if (parentRef.left_ == eraseIndex) {
+      parentRef.left_ = child;
+    } else {
+      parentRef.right_ = child;
     }
   }
 
@@ -824,6 +822,7 @@ private:
         node = grandparent;
       } else {
         if (uncle != empty_index_) {
+          // Maintains a heap-like structure
           _swapNodePosition(uncle, node);
           node = uncle;
         }
@@ -948,10 +947,11 @@ private:
     auto& childRef  = tree_[child];
     // Update Children
     size_type childRight = childRef.right_;
-    size_type nodeLeft   = nodeRef.left_;
     if (childRight != empty_index_) {
       tree_[childRight].parent_ = node;
     }
+    // Update Parent
+    size_type nodeLeft = nodeRef.left_;
     if (nodeLeft != empty_index_) {
       tree_[nodeLeft].parent_ = child;
     }
@@ -970,10 +970,11 @@ private:
     auto& childRef  = tree_[child];
     // Update Children
     size_type childLeft = childRef.left_;
-    size_type nodeRight = nodeRef.right_;
     if (childLeft != empty_index_) {
       tree_[childLeft].parent_ = node;
     }
+    // Update Parent
+    size_type nodeRight = nodeRef.right_;
     if (nodeRight != empty_index_) {
       tree_[nodeRight].parent_ = child;
     }
@@ -1060,12 +1061,14 @@ private:
     if (nodeA == nodeB) {
       return;
     }
+    // Update child and parent index for erase method
     if (nodeA == child) {
       child = nodeB;
     }
     if (nodeA == parent) {
       parent = nodeB;
     }
+    // Saves computation time (~2-3 nanoseconds)
     auto& nodeARef        = tree_[nodeA];
     size_type nodeAParent = nodeARef.parent_;
     size_type nodeALeft   = nodeARef.left_;
@@ -1129,7 +1132,7 @@ private:
       while ((left = tree_[node].left_) != empty_index_) { node = left; }
       return node;
     }
-
+    // If no right child then backtrack
     size_type parent = empty_index_;
     while ((parent = tree_[node].parent_) && parent != empty_index_ &&
            node == tree_[parent].right_) {
@@ -1148,7 +1151,7 @@ private:
       while ((right = tree_[node].right_) != empty_index_) { node = right; }
       return node;
     }
-
+    // If no left child then backtrack
     size_type parent = empty_index_;
     while ((parent = tree_[node].parent_) && parent != empty_index_ &&
            node == tree_[parent].left_) {
@@ -1166,14 +1169,11 @@ private:
 
   void _resizeTree(size_type new_cap = 0) {
     if (new_cap > capacity_) {
-      tree_.resize(capacity_);
+      tree_.resize(new_cap);
+      return;
     }
     if (size_ == capacity_) {
-      if (capacity_ >= empty_index_ / 2) {
-        capacity_ = empty_index_;
-      } else {
-        capacity_ *= 2;
-      }
+      capacity_ = std::min(empty_index_, capacity_ * 2);
       tree_.resize(capacity_);
     }
   }
@@ -1181,33 +1181,52 @@ private:
 
 }// namespace details
 
+// Documentation:
+// FlatMap<Key, Value, MaxSize, Compare, Allocator>
+// Key: Must be copyable or moveable type
+// Value: Must be copyable or moveable type
+// MaxSize: Integral type used for tree size optimizations.
+//          If you know the max size is less than default std::size_t, then
+//          specify and the node will use the new type and save space
+// Compare: Function used to compare keys, default std::less
+// Allocator: Allocator passed to the vector, takes a dro::details::Node
+
 template <details::FlatTree_Type Key, details::FlatTree_Type Value,
-          details::Integral Size = std::size_t,
-          typename Compare       = std::less<Key>,
+          details::Integral MaxSize = std::size_t,
+          typename Compare          = std::less<Key>,
           typename Allocator =
-              std::allocator<details::Node<std::pair<Key, Value>, Size>>>
+              std::allocator<details::Node<std::pair<Key, Value>, MaxSize>>>
 class FlatMap : public details::FlatRBTree<Key, Value, std::pair<Key, Value>,
-                                           Size, Compare, Allocator> {
-  using size_type = Size;
-  using tree_type = details::FlatRBTree<Key, Value, std::pair<Key, Value>, Size,
-                                        Compare, Allocator>;
+                                           MaxSize, Compare, Allocator> {
+  using size_type = MaxSize;
+  using tree_type = details::FlatRBTree<Key, Value, std::pair<Key, Value>,
+                                        MaxSize, Compare, Allocator>;
 
 public:
   explicit FlatMap(size_type capacity = 1, Allocator allocator = Allocator())
       : tree_type(capacity, allocator) {}
 };
 
-template <details::FlatTree_Type Key, details::Integral Size = std::size_t,
+// Documentation:
+// FlatSet<Key, MaxSize, Compare, Allocator>
+// Key: Must be copyable or moveable type
+// MaxSize: Integral type used for tree size optimizations.
+//          If you know the max size is less than default std::size_t, then
+//          specify and the node will use the new type and save space
+// Compare: Function used to compare keys, default std::less
+// Allocator: Allocator passed to the vector, takes a dro::details::Node
+
+template <details::FlatTree_Type Key, details::Integral MaxSize = std::size_t,
           typename Compare = std::less<Key>,
           typename Allocator =
-              std::allocator<details::Node<details::PairFlatSet<Key>, Size>>>
+              std::allocator<details::Node<details::FlatSetPair<Key>, MaxSize>>>
 class FlatSet : public details::FlatRBTree<Key, details::FlatSetEmptyType,
-                                           details::PairFlatSet<Key>, Size,
+                                           details::FlatSetPair<Key>, MaxSize,
                                            Compare, Allocator> {
-  using size_type = Size;
-  using tree_type =
-      details::FlatRBTree<Key, details::FlatSetEmptyType,
-                          details::PairFlatSet<Key>, Size, Compare, Allocator>;
+  using size_type = MaxSize;
+  using tree_type = details::FlatRBTree<Key, details::FlatSetEmptyType,
+                                        details::FlatSetPair<Key>, MaxSize,
+                                        Compare, Allocator>;
 
 public:
   explicit FlatSet(size_type capacity = 1, Allocator allocator = Allocator())
