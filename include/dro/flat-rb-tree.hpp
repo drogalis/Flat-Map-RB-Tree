@@ -47,17 +47,17 @@ template <FlatTree_Type Key> struct FlatSetPair {
   bool operator!=(const FlatSetPair& other) { return ! (*this == other); }
 };
 
-template <typename Pair, Integral Size = std::size_t> struct Node {
-  using size_type = Size;
+template <typename Pair, Integral MaxSize = std::size_t> struct Node {
+  using size_type = MaxSize;
   // This empty_index_ definition goes against DRY. Not sure most elegant
   // solution that also enforces correctness
   constexpr static size_type empty_index_ =
       std::numeric_limits<size_type>::max();
 
   Pair pair_;
-  Size parent_ {empty_index_};
-  Size left_ {empty_index_};
-  Size right_ {empty_index_};
+  size_type parent_ {empty_index_};
+  size_type left_ {empty_index_};
+  size_type right_ {empty_index_};
   bool color_ {};
 
   Node() = default;
@@ -176,21 +176,22 @@ private:
 };
 
 template <FlatTree_Type Key, FlatTree_Type Value, typename Pair,
-          Integral Size = std::size_t, typename Compare = std::less<Key>,
-          typename Allocator = std::allocator<Node<Pair, Size>>>
+          Integral MaxSize = std::size_t, typename Compare = std::less<Key>,
+          typename Allocator = std::allocator<Node<Pair, MaxSize>>>
 class FlatRBTree {
 
 public:
   using key_type        = Key;
   using mapped_type     = Value;
   using value_type      = Pair;
-  using size_type       = Size;
+  using size_type       = MaxSize;
   using difference_type = std::ptrdiff_t;
   using key_compare     = Compare;
   using allocator_type  = Allocator;
-  using node_type       = Node<Pair, Size>;
-  using self_type      = FlatRBTree<Key, Value, Pair, Size, Compare, Allocator>;
-  using iterator       = FlatTreeIterator<self_type>;
+  using node_type       = Node<value_type, size_type>;
+  using self_type = FlatRBTree<key_type, mapped_type, value_type, size_type,
+                               key_compare, allocator_type>;
+  using iterator  = FlatTreeIterator<self_type>;
   using const_iterator = FlatTreeIterator<const self_type>;
 
 private:
@@ -853,91 +854,98 @@ private:
     uncleRef.color_       = BLACK_;
   }
 
-  // THIS FUNCTION IS TERRIBLE
-  // THE RB TREE LOGIC IS COMPLEX
-  // NEEDS TO BE REFACTORED
   void _fixErase(size_type node, size_type parent) {
     size_type sibling = empty_index_;
     while (node != root_ &&
            (node == empty_index_ || tree_[node].color_ == BLACK_)) {
       auto& nodeRef   = tree_[node];
       auto& parentRef = tree_[parent];
-      // Left Tree Erase
-      if (node == parentRef.left_) {
-        sibling = parentRef.right_;
-        if (tree_[sibling].color_ == RED_) {
-          tree_[sibling].color_ = BLACK_;
-          parentRef.color_      = RED_;
-          parent                = _rotateLeft(parent);
-          sibling               = tree_[parent].right_;
-        }
-        auto& siblingRef = tree_[sibling];
-        if ((siblingRef.left_ == empty_index_ ||
-             tree_[siblingRef.left_].color_ == BLACK_) &&
-            (siblingRef.right_ == empty_index_ ||
-             tree_[siblingRef.right_].color_ == BLACK_)) {
-          siblingRef.color_ = RED_;
-          node              = parent;
-          parent            = tree_[node].parent_;
-        } else {
-          if (siblingRef.right_ == empty_index_ ||
-              tree_[siblingRef.right_].color_ == BLACK_) {
-            if (siblingRef.left_ != empty_index_) {
-              tree_[siblingRef.left_].color_ = BLACK_;
-            }
-            siblingRef.color_ = RED_;
-            sibling           = _rotateRight(sibling);
-            sibling           = tree_[parent].right_;
-          }
-          tree_[sibling].color_ = tree_[parent].color_;
-          tree_[parent].color_  = BLACK_;
-          if (tree_[sibling].right_ != empty_index_) {
-            tree_[tree_[sibling].right_].color_ = BLACK_;
-          }
-          _rotateLeft(parent);
-          node = root_;
-          break;
-        }
-        // Right Tree Erase
+      bool isLeftTree = (node == parentRef.left_);
+      // Analyze Sibling
+      sibling = (isLeftTree) ? parentRef.right_ : parentRef.left_;
+      _checkSiblingRed(sibling, parent, isLeftTree);
+      auto& siblingRef = tree_[sibling];
+      if (_checkSiblingChildColor(siblingRef, node, parent)) {
+        // Fix Side of Tree
       } else {
-        size_type sibling = parentRef.left_;
-        if (tree_[sibling].color_ == RED_) {
-          tree_[sibling].color_ = BLACK_;
-          parentRef.color_      = RED_;
-          parent                = _rotateRight(parent);
-          sibling               = tree_[parent].left_;
-        }
-        auto& siblingRef = tree_[sibling];
-        if ((siblingRef.left_ == empty_index_ ||
-             tree_[siblingRef.left_].color_ == BLACK_) &&
-            (siblingRef.right_ == empty_index_ ||
-             tree_[siblingRef.right_].color_ == BLACK_)) {
-          siblingRef.color_ = RED_;
-          node              = parent;
-          parent            = tree_[node].parent_;
+        if (isLeftTree) {
+          _fixEraseLeftTree(siblingRef, sibling, parent);
+          _rotateLeft(parent);
         } else {
-          if (siblingRef.left_ == empty_index_ ||
-              tree_[siblingRef.left_].color_ == BLACK_) {
-            if (siblingRef.right_ != empty_index_) {
-              tree_[siblingRef.right_].color_ = BLACK_;
-            }
-            siblingRef.color_ = RED_;
-            sibling           = _rotateLeft(sibling);
-            sibling           = tree_[parent].left_;
-          }
-          tree_[sibling].color_ = tree_[parent].color_;
-          tree_[parent].color_  = BLACK_;
-          if (tree_[sibling].left_ != empty_index_) {
-            tree_[tree_[sibling].left_].color_ = BLACK_;
-          }
+          _fixEraseRightTree(siblingRef, sibling, parent);
           _rotateRight(parent);
-          node = root_;
-          break;
         }
+        node = root_;
+        break;
       }
     }
     if (node != empty_index_) {
       tree_[node].color_ = BLACK_;
+    }
+  }
+
+  void _checkSiblingRed(size_type& sibling, size_type& parent,
+                        bool isLeftTree) {
+    if (tree_[sibling].color_ == RED_) {
+      tree_[sibling].color_ = BLACK_;
+      tree_[parent].color_  = RED_;
+      if (isLeftTree) {
+        parent  = _rotateLeft(parent);
+        sibling = tree_[parent].right_;
+      } else {
+        parent  = _rotateRight(parent);
+        sibling = tree_[parent].left_;
+      }
+    }
+  }
+
+  bool _checkSiblingChildColor(auto& siblingRef, size_type& node,
+                               size_type& parent) {
+    if ((siblingRef.left_ == empty_index_ ||
+         tree_[siblingRef.left_].color_ == BLACK_) &&
+        (siblingRef.right_ == empty_index_ ||
+         tree_[siblingRef.right_].color_ == BLACK_)) {
+      siblingRef.color_ = RED_;
+      node              = parent;
+      parent            = tree_[node].parent_;
+      return true;
+    }
+    return false;
+  }
+
+  void _fixEraseLeftTree(auto& siblingRef, size_type& sibling,
+                         size_type& parent) {
+    if (siblingRef.right_ == empty_index_ ||
+        tree_[siblingRef.right_].color_ == BLACK_) {
+      if (siblingRef.left_ != empty_index_) {
+        tree_[siblingRef.left_].color_ = BLACK_;
+      }
+      siblingRef.color_ = RED_;
+      sibling           = _rotateRight(sibling);
+      sibling           = tree_[parent].right_;
+    }
+    tree_[sibling].color_ = tree_[parent].color_;
+    tree_[parent].color_  = BLACK_;
+    if (tree_[sibling].right_ != empty_index_) {
+      tree_[tree_[sibling].right_].color_ = BLACK_;
+    }
+  }
+
+  void _fixEraseRightTree(auto& siblingRef, size_type& sibling,
+                          size_type& parent) {
+    if (siblingRef.left_ == empty_index_ ||
+        tree_[siblingRef.left_].color_ == BLACK_) {
+      if (siblingRef.right_ != empty_index_) {
+        tree_[siblingRef.right_].color_ = BLACK_;
+      }
+      siblingRef.color_ = RED_;
+      sibling           = _rotateLeft(sibling);
+      sibling           = tree_[parent].left_;
+    }
+    tree_[sibling].color_ = tree_[parent].color_;
+    tree_[parent].color_  = BLACK_;
+    if (tree_[sibling].left_ != empty_index_) {
+      tree_[tree_[sibling].left_].color_ = BLACK_;
     }
   }
 
