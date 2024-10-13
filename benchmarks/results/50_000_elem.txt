@@ -1,11 +1,11 @@
 Dro FlatMap: 
 Average insertion time: 142 ns.
 Total find time: 19 ns.
-Average Erase time: 135 ns.
+Average Erase time: 104 ns.
 STL Map: 
 Average insertion time: 192 ns.
 Total find time: 18 ns.
-Average Erase time: 192 ns.
+Average Erase time: 169 ns.
 Boost FlatMap: 
 Average insertion time: 6733 ns.
 Total find time: 19 ns.
