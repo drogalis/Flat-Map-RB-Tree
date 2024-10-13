@@ -592,8 +592,8 @@ private:
       return {iterator(this, insertIndex), true};
     }
     _insertUpdateParentRoot(key, parent, insertIndex);
-    _fixInsert(insertIndex);
-    return {iterator(this, _findIndex(key)), true};
+    insertIndex = _fixInsert(insertIndex, key);
+    return {iterator(this, insertIndex), true};
   }
 
   // Overload For FlatSet
@@ -626,8 +626,8 @@ private:
       return {iterator(this, insertIndex), true};
     }
     _insertUpdateParentRoot(key, parent, insertIndex);
-    _fixInsert(insertIndex);
-    return {iterator(this, _findIndex(key)), true};
+    insertIndex = _fixInsert(insertIndex, newNodeRef.pair_.first);
+    return {iterator(this, insertIndex), true};
   }
 
   std::pair<size_type, bool> _findInsertLocation(key_type key) {
@@ -658,7 +658,7 @@ private:
   }
 
   bool _erase(key_type key) {
-    size_type eraseIndex = _findIndexErase(key);
+    size_type eraseIndex = _findIndex(key);
     if (eraseIndex == empty_index_) {
       return false;
     }
@@ -703,7 +703,7 @@ private:
     return true;
   }
 
-  size_type _findIndexErase(key_type key) {
+  size_type _findIndex(key_type key) const {
     size_type node = root_;
     // Find node with binary search
     while (node != empty_index_) {
@@ -718,27 +718,13 @@ private:
     return empty_index_;
   }
 
-  void _prefetchBinarySearch(auto& nodeRef) {
+  void _prefetchBinarySearch(auto& nodeRef) const {
     size_type nextLeft =
         (nodeRef.left_ == empty_index_) ? size_ - 1 : nodeRef.left_;
     size_type nextRight =
         (nodeRef.right_ == empty_index_) ? size_ - 1 : nodeRef.right_;
     __builtin_prefetch(&tree_[nextLeft]);
     __builtin_prefetch(&tree_[nextRight]);
-  }
-
-  size_type _findIndex(key_type key) const {
-    size_type node = root_;
-    // Find node with binary search
-    while (node != empty_index_) {
-      auto& nodeRef = tree_[node];
-      if (nodeRef.pair_.first == key) {
-        return node;
-      }
-      bool compare = key_compare()(nodeRef.pair_.first, key);
-      node         = compare ? nodeRef.right_ : nodeRef.left_;
-    }
-    return empty_index_;
   }
 
   void _updateParent(size_type node, size_type newParent) {
@@ -826,7 +812,8 @@ private:
     }
   }
 
-  void _fixInsert(size_type node) {
+  size_type _fixInsert(size_type node, key_type key) {
+    size_type baseNode = node;
     while (node != root_ && tree_[tree_[node].parent_].color_ == RED_) {
       size_type parent      = tree_[node].parent_;
       auto& parentRef       = tree_[parent];
@@ -859,10 +846,14 @@ private:
           _rotateLeft(grandparent);
         }
         std::swap(parentRef.color_, grandparentRef.color_);
+        if (tree_[grandparent].pair_.first == key) {
+          baseNode = grandparent;
+        }
         node = parent;
       }
     }
     tree_[root_].color_ = BLACK_;
+    return baseNode;
   }
 
   void _updateInsertColors(auto& uncleRef, auto& parentRef,
