@@ -1,20 +1,24 @@
 # Flat Map RB Tree
 
 A STL compliant map and set that uses a red black tree under the hood. Much faster than [boost::flat_map](https://www.boost.org/doc/libs/1_76_0/boost/container/flat_map.hpp) for any workload over ~250 elements.
-Beats [std::map](https://en.cppreference.com/w/cpp/container/map) with full optimizations enabled.
+Beats [std::map](https://en.cppreference.com/w/cpp/container/map) for when full optimizations are enabled.
 
 ## Table of Contents
 
-- [Implementation](#Implementation)
 - [Usage](#Usage)
+- [Algorithm Design](#Algorithm-Design)
 - [Benchmarks](#Benchmarks)
 - [Installing](#Installing)
-- [License](#License)
+- [Sources](#Sources)
 
 ## Implementation
 
-This flat map uses a vector to store the tree nodes, and maintains an approximate [heap](<https://en.wikipedia.org/wiki/Heap_(data_structure)#:~:text=In%20computer%20science%2C%20a%20heap,The%20node%20at%20the%20%22top%22>) structure for a cache optimized [binary search](https://en.wikipedia.org/wiki/Binary_search#:~:text=Binary%20search%20compares%20the%20target,the%20target%20value%20is%20found.). In
-order to validate the correctness of the balancing algorithm, a full tree traversal is performed comparing the flat map to the STL Tree implementation.
+This flat map uses a vector to store the tree nodes, and maintains an approximate [heap](<https://en.wikipedia.org/wiki/Heap_(data_structure)#:~:text=In%20computer%20science%2C%20a%20heap,The%20node%20at%20the%20%22top%22>) 
+structure for a cache optimized [binary search](https://en.wikipedia.org/wiki/Binary_search#:~:text=Binary%20search%20compares%20the%20target,the%20target%20value%20is%20found.). 
+
+In order to validate the correctness of the balancing algorithm, a full tree traversal is performed comparing the flat map to the STL Tree implementation. Many red black trees have subtle errors due to lack of validation.
+
+
 
 ## *Beta Testing*
 
@@ -24,13 +28,23 @@ ToDo:
 
 ## Usage
 
-Some points to note:
+Main points:
 
 - The key and value must be default constructible.
-- The biggest limitation compared to std::map is the iterators are invalidated on all modifying operations.
-- Memory isn't deallocated on erase.
+- The key and value must be copy or move assignable.
+- Memory isn't deallocated on erase. Must call shrink_to_fit to free memory, or wait on destructor.
+- <u>Weakness:</u> All the iterators are invalidated on all modifying operations.
 
 #### Constructor
+
+The full list of template arguments are as follows:
+- Key: Must be default constructible and a copyable or moveable type
+- Value: Must be default constructible and a copyable or moveable type
+- MaxSize: Integral type used for tree size optimizations. 
+- Compare: Function used to compare keys, default std::less
+- Allocator: Allocator passed to the vector, takes a dro::details::Node as the template parameter.
+
+The default capacity is (1) and the std::allocator is the default memory allocator. 
 
 - `FlatMap<Key, Value, MaxSize> flatMap(size_type capacity = 1, Allocator allocator = Allocator());`
 
@@ -186,6 +200,14 @@ Some points to note:
 
   Returns the function that compares keys in object of type value_type.
 
+## Algorithm Design
+
+I made some modifications to the red black tree algorithm to better apply it to a vector container.
+- Swapped the parent and child location in memory on rotate operations.
+- Swapped the uncle and node when the uncle isn't red and is a valid index.
+- On erase, swapped the deleted key with minNode, and then swapped to the end of the vector.
+- Prefetched the next level node for binary search on inserts and erase.
+
 ## Benchmarks
 
 These benchmarks were taken on a (4) core Intel(R) Core(TM) i5-9300H CPU @ 2.40GHz with isolcpus on cores 2 and 3.
@@ -212,6 +234,13 @@ To build and install the shared library, run the commands below.
     $ make
     $ sudo make install
 ```
+
+## Sources
+
+For help with building the red black tree algorithm, I want to cite the following sources:
+
+[Linux RB Tree](https://github.com/torvalds/linux/blob/master/lib/rbtree.c)
+[GCC STL Tree](https://github.com/gcc-mirror/gcc/blob/master/libstdc++-v3/include/bits/stl_tree.h)
 
 ## License
 
