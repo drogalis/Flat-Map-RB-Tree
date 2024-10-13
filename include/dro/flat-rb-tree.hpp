@@ -516,43 +516,43 @@ public:
   }
 
   [[nodiscard]] iterator lower_bound(const key_type& key) {
-    return iterator(this, _notLessThan(key));
+    return iterator(this, _lowerBound(key));
   }
 
   [[nodiscard]] const_iterator lower_bound(const key_type& key) const {
-    return const_iterator(this, _notLessThan(key));
+    return const_iterator(this, _lowerBound(key));
   }
 
   template <typename K>
   [[nodiscard]] iterator lower_bound(const K& x)
     requires std::is_convertible_v<K, key_type>
   {
-    return iterator(this, _notLessThan(x));
+    return iterator(this, _lowerBound(x));
   }
   template <typename K>
   [[nodiscard]] const_iterator lower_bound(const K& x) const
     requires std::is_convertible_v<K, key_type>
   {
-    return const_iterator(this, _notLessThan(x));
+    return const_iterator(this, _lowerBound(x));
   }
 
   [[nodiscard]] iterator upper_bound(const key_type& key) {
-    return iterator(this, _greaterThan(key));
+    return iterator(this, _upperBound(key));
   }
   [[nodiscard]] const_iterator upper_bound(const key_type& key) const {
-    return const_iterator(this, _greaterThan(key));
+    return const_iterator(this, _upperBound(key));
   }
   template <typename K>
   [[nodiscard]] iterator upper_bound(const K& x)
     requires std::is_convertible_v<K, key_type>
   {
-    return iterator(this, _greaterThan(x));
+    return iterator(this, _upperBound(x));
   }
   template <typename K>
   [[nodiscard]] const_iterator upper_bound(const K& x) const
     requires std::is_convertible_v<K, key_type>
   {
-    return const_iterator(this, _greaterThan(x));
+    return const_iterator(this, _upperBound(x));
   }
 
   // Observers
@@ -733,60 +733,36 @@ private:
     }
   }
 
-  size_type _greaterThan(key_type key) const {
+  size_type _upperBound(key_type key) const {
     size_type node     = root_;
     size_type lastNode = empty_index_;
     // Find node with binary search
     while (node != empty_index_) {
       auto& nodeRef = tree_[node];
-      if (key_compare()(nodeRef.pair_.first, key) ||
-          nodeRef.pair_.first == key) {
-        node = nodeRef.right_;
-      } else {
-        node = nodeRef.left_;
-        if (node == empty_index_) {
-          return lastNode;
-        }
-        auto& newNodeRef = tree_[node];
-        if (lastNode != empty_index_ &&
-            (key_compare()(newNodeRef.pair_.first, key) ||
-             newNodeRef.pair_.first == key) &&
-            ! (key_compare()(tree_[lastNode].pair_.first, key))) {
-          return lastNode;
-        }
-      }
-      lastNode = node;
+      //_prefetchBinarySearch(nodeRef);
+      bool compare = (key_compare()(nodeRef.pair_.first, key) ||
+                      nodeRef.pair_.first == key);
+      lastNode     = compare ? lastNode : node;
+      node         = compare ? nodeRef.right_ : nodeRef.left_;
     }
-    return empty_index_;
+    return lastNode;
   }
 
-  size_type _notLessThan(key_type key) const {
+  size_type _lowerBound(key_type key) const {
     size_type node     = root_;
     size_type lastNode = empty_index_;
     // Find node with binary search
     while (node != empty_index_) {
       auto& nodeRef = tree_[node];
+      _prefetchBinarySearch(nodeRef);
       if (nodeRef.pair_.first == key) {
         return node;
       }
-      if (key_compare()(nodeRef.pair_.first, key)) {
-        node = nodeRef.right_;
-      } else {
-        node = nodeRef.left_;
-        if (node == empty_index_) {
-          return lastNode;
-        }
-        auto& newNodeRef = tree_[node];
-        if (lastNode != empty_index_ &&
-            key_compare()(newNodeRef.pair_.first, key) &&
-            (! key_compare()(tree_[lastNode].pair_.first, key) ||
-             tree_[lastNode].pair_.first == key)) {
-          return lastNode;
-        }
-      }
-      lastNode = node;
+      bool compare = key_compare()(nodeRef.pair_.first, key);
+      lastNode     = compare ? lastNode : node;
+      node         = compare ? nodeRef.right_ : nodeRef.left_;
     }
-    return empty_index_;
+    return lastNode;
   }
 
   void _transferData(size_type nodeLeft, size_type nodeRight) {
