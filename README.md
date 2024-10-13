@@ -1,6 +1,6 @@
 # Flat Map RB Tree
 
-A STL compliant map and set that uses a red black tree under the hood. Much faster than [boost::flat_map](https://www.boost.org/doc/libs/1_76_0/boost/container/flat_map.hpp) for any workload over ~250 elements.
+A STL compliant map and set that uses a red black tree under the hood. Much faster than [boost::flat_map](https://www.boost.org/doc/libs/1_76_0/boost/container/flat_map.hpp) for any insert or delete heavy workload over ~250 elements.
 Beats [std::map](https://en.cppreference.com/w/cpp/container/map) for all workloads when full optimizations are enabled.
 
 ## Table of Contents
@@ -221,7 +221,9 @@ Most important aspects of benchmarking:
 
 <img src="https://raw.githubusercontent.com/drogalis/Flat-Map-RB-Tree/refs/heads/main/assets/Average%20Random%20Insertion%20Time.png" alt="Average Random Insertion Time" style="padding-top: 10px;">
 
-<img src="https://raw.githubusercontent.com/drogalis/Flat-Map-RB-Tree/refs/heads/main/assets/Average%20Random%20Deletion%20Time.png" alt="Average Random Insertion Time" style="padding-top: 10px;">
+<img src="https://raw.githubusercontent.com/drogalis/Flat-Map-RB-Tree/refs/heads/main/assets/Average%20Random%20Find%20Time.png" alt="Average Random Find Time" style="padding-top: 10px;">
+
+<img src="https://raw.githubusercontent.com/drogalis/Flat-Map-RB-Tree/refs/heads/main/assets/Average%20Random%20Deletion%20Time.png" alt="Average Random Deletion Time" style="padding-top: 10px;">
 
 ## Installing
 
