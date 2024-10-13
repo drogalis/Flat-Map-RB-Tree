@@ -41,7 +41,7 @@ int main() {
   for (auto i : randInts) { dro_.emplace(Test(i), Test(i)); }
   auto stop = std::chrono::high_resolution_clock::now();
 
-  std::cout << "Average insertion time: "
+  std::cout << "Mean insertion time: "
             << std::chrono::duration_cast<std::chrono::nanoseconds>(stop -
                                                                     start)
                        .count() /
@@ -57,7 +57,7 @@ int main() {
   }
   stop = std::chrono::high_resolution_clock::now();
 
-  std::cout << "Total find time: "
+  std::cout << "Mean find time: "
             << std::chrono::duration_cast<std::chrono::nanoseconds>(stop -
                                                                     start)
                        .count() /
@@ -69,7 +69,7 @@ int main() {
   for (auto i : randInts) { dro_.erase(Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
-  std::cout << "Average Erase time: "
+  std::cout << "Mean erase time: "
             << std::chrono::duration_cast<std::chrono::nanoseconds>(stop -
                                                                     start)
                        .count() /
@@ -87,7 +87,7 @@ int main() {
   for (auto i : randInts) { stl_.emplace(Test(i), Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
-  std::cout << "Average insertion time: "
+  std::cout << "Mean insertion time: "
             << std::chrono::duration_cast<std::chrono::nanoseconds>(stop -
                                                                     start)
                        .count() /
@@ -103,7 +103,7 @@ int main() {
   }
   stop = std::chrono::high_resolution_clock::now();
 
-  std::cout << "Total find time: "
+  std::cout << "Mean find time: "
             << std::chrono::duration_cast<std::chrono::nanoseconds>(stop -
                                                                     start)
                        .count() /
@@ -115,7 +115,7 @@ int main() {
   for (auto i : randInts) { stl_.erase(Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
-  std::cout << "Average Erase time: "
+  std::cout << "Mean erase time: "
             << std::chrono::duration_cast<std::chrono::nanoseconds>(stop -
                                                                     start)
                        .count() /
@@ -132,7 +132,7 @@ int main() {
   for (auto i : randInts) { boost_.emplace(Test(i), Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
-  std::cout << "Average insertion time: "
+  std::cout << "Mean insertion time: "
             << std::chrono::duration_cast<std::chrono::nanoseconds>(stop -
                                                                     start)
                        .count() /
@@ -148,7 +148,7 @@ int main() {
   }
   stop = std::chrono::high_resolution_clock::now();
 
-  std::cout << "Total find time: "
+  std::cout << "Mean find time: "
             << std::chrono::duration_cast<std::chrono::nanoseconds>(stop -
                                                                     start)
                        .count() /
@@ -160,7 +160,7 @@ int main() {
   for (auto i : randInts) { boost_.erase(Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
-  std::cout << "Average Erase time: "
+  std::cout << "Mean erase time: "
             << std::chrono::duration_cast<std::chrono::nanoseconds>(stop -
                                                                     start)
                        .count() /
