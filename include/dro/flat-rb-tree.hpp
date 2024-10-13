@@ -8,7 +8,6 @@
 #ifndef DRO_FLAT_RED_BLACK_TREE
 #define DRO_FLAT_RED_BLACK_TREE
 
-#include <algorithm>  // for std::min
 #include <concepts>   // for requires
 #include <cstddef>    // for size_t, ptrdiff_t
 #include <functional> // for less
@@ -256,7 +255,7 @@ public:
   mapped_type& at(const key_type& key)
     requires(! std::is_same_v<mapped_type, FlatSetEmptyType>)
   {
-    size_type index = _find_index(key);
+    size_type index = _findIndex(key);
     if (index == empty_index_) {
       throw std::out_of_range("Key not found");
     }
@@ -266,7 +265,7 @@ public:
   const mapped_type& at(const key_type& key) const
     requires(! std::is_same_v<mapped_type, FlatSetEmptyType>)
   {
-    size_type index = _find_index(key);
+    size_type index = _findIndex(key);
     if (index == empty_index_) {
       throw std::out_of_range("Key not found");
     }
@@ -276,7 +275,7 @@ public:
   mapped_type& operator[](const key_type& key)
     requires(! std::is_same_v<mapped_type, FlatSetEmptyType>)
   {
-    size_type index = _find_index(key);
+    size_type index = _findIndex(key);
     if (index == empty_index_) {
       index = _emplace(key).first.index_;
     }
@@ -286,7 +285,7 @@ public:
   mapped_type& operator[](key_type&& key)
     requires(! std::is_same_v<mapped_type, FlatSetEmptyType>)
   {
-    size_type index = _find_index(key);
+    size_type index = _findIndex(key);
     if (index == empty_index_) {
       index = _emplace(key).first.index_;
     }
@@ -427,13 +426,13 @@ public:
 
   node_type extract(const_iterator position) { return tree_[position.index_]; }
 
-  node_type extract(const key_type& key) { return tree_[_find_index(key)]; }
+  node_type extract(const key_type& key) { return tree_[_findIndex(key)]; }
 
   template <typename K>
   node_type extract(K&& x)
     requires std::is_convertible_v<K, key_type>
   {
-    return tree_[_find_index(x)];
+    return tree_[_findIndex(x)];
   }
 
   void merge(self_type& source) {
@@ -461,36 +460,36 @@ public:
   }
 
   [[nodiscard]] iterator find(const key_type& key) {
-    return iterator(this, _find_index(key));
+    return iterator(this, _findIndex(key));
   }
 
   [[nodiscard]] const_iterator find(const key_type& key) const {
-    return const_iterator(this, _find_index(key));
+    return const_iterator(this, _findIndex(key));
   }
 
   template <typename K>
   [[nodiscard]] iterator find(const K& x)
     requires std::is_convertible_v<K, key_type>
   {
-    return iterator(this, _find_index(x));
+    return iterator(this, _findIndex(x));
   }
 
   template <typename K>
   [[nodiscard]] const_iterator find(const K& x) const
     requires std::is_convertible_v<K, key_type>
   {
-    return const_iterator(this, _find_index(x));
+    return const_iterator(this, _findIndex(x));
   }
 
   [[nodiscard]] bool contains(const key_type& key) const {
-    return _find_index(key) != empty_index_;
+    return _findIndex(key) != empty_index_;
   }
 
   template <typename K>
   [[nodiscard]] bool contains(const K& x) const
     requires std::is_convertible_v<K, key_type>
   {
-    return _find_index(x) != empty_index_;
+    return _findIndex(x) != empty_index_;
   }
 
   [[nodiscard]] std::pair<iterator, iterator> equal_range(const key_type& key) {
@@ -594,7 +593,7 @@ private:
     }
     _insertUpdateParentRoot(key, parent, insertIndex);
     _fixInsert(insertIndex);
-    return {iterator(this, _find_index(key)), true};
+    return {iterator(this, _findIndex(key)), true};
   }
 
   // Overload For FlatSet
@@ -628,7 +627,7 @@ private:
     }
     _insertUpdateParentRoot(key, parent, insertIndex);
     _fixInsert(insertIndex);
-    return {iterator(this, _find_index(key)), true};
+    return {iterator(this, _findIndex(key)), true};
   }
 
   std::pair<size_type, bool> _findInsertLocation(key_type key) {
@@ -637,15 +636,13 @@ private:
     while (node != empty_index_) {
       parent          = node;
       auto& parentRef = tree_[parent];
+      _prefetchBinarySearch(parentRef);
       // Key found
       if (key == parentRef.pair_.first) {
         return {parent, false};
       }
-      if (key_compare()(key, parentRef.pair_.first)) {
-        node = parentRef.left_;
-      } else {
-        node = parentRef.right_;
-      }
+      bool compare = key_compare()(key, parentRef.pair_.first);
+      node         = compare ? parentRef.left_ : parentRef.right_;
     }
     return {parent, true};
   }
@@ -661,7 +658,7 @@ private:
   }
 
   bool _erase(key_type key) {
-    size_type eraseIndex = _find_index(key);
+    size_type eraseIndex = _findIndexErase(key);
     if (eraseIndex == empty_index_) {
       return false;
     }
@@ -706,7 +703,31 @@ private:
     return true;
   }
 
-  size_type _find_index(key_type key) const {
+  size_type _findIndexErase(key_type key) {
+    size_type node = root_;
+    // Find node with binary search
+    while (node != empty_index_) {
+      auto& nodeRef = tree_[node];
+      _prefetchBinarySearch(nodeRef);
+      if (nodeRef.pair_.first == key) {
+        return node;
+      }
+      bool compare = key_compare()(nodeRef.pair_.first, key);
+      node         = compare ? nodeRef.right_ : nodeRef.left_;
+    }
+    return empty_index_;
+  }
+
+  void _prefetchBinarySearch(auto& nodeRef) {
+    size_type nextLeft =
+        (nodeRef.left_ == empty_index_) ? size_ - 1 : nodeRef.left_;
+    size_type nextRight =
+        (nodeRef.right_ == empty_index_) ? size_ - 1 : nodeRef.right_;
+    __builtin_prefetch(&tree_[nextLeft]);
+    __builtin_prefetch(&tree_[nextRight]);
+  }
+
+  size_type _findIndex(key_type key) const {
     size_type node = root_;
     // Find node with binary search
     while (node != empty_index_) {
@@ -714,11 +735,8 @@ private:
       if (nodeRef.pair_.first == key) {
         return node;
       }
-      if (key_compare()(nodeRef.pair_.first, key)) {
-        node = nodeRef.right_;
-      } else {
-        node = nodeRef.left_;
-      }
+      bool compare = key_compare()(nodeRef.pair_.first, key);
+      node         = compare ? nodeRef.right_ : nodeRef.left_;
     }
     return empty_index_;
   }
@@ -1181,7 +1199,7 @@ private:
       return;
     }
     if (size_ == capacity_) {
-      capacity_ = std::min(empty_index_, capacity_ * 2);
+      capacity_ = (empty_index_ / 2 < capacity_) ? empty_index_ : capacity_ * 2;
       tree_.resize(capacity_);
     }
   }
@@ -1240,5 +1258,6 @@ public:
   explicit FlatSet(size_type capacity = 1, Allocator allocator = Allocator())
       : tree_type(capacity, allocator) {}
 };
+
 }// namespace dro
 #endif
