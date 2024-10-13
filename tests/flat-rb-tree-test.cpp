@@ -140,7 +140,7 @@ template <typename T> struct TreeBuilder {
 int main() {
   {
     dro::details::TreeBuilder<int> rbTree;
-    std::cout << "Starting Tree Traversal Test... Runtime ~10 seconds.\n";
+    std::cout << "Starting Tree Traversal Test... Runtime ~20 seconds.\n";
 
     const int iters = 10'000;
     std::vector<std::size_t> randNum(iters, 0);

@@ -1,7 +1,7 @@
 # Flat Map RB Tree
 
 A STL compliant map and set that uses a red black tree under the hood. Much faster than [boost::flat_map](https://www.boost.org/doc/libs/1_76_0/boost/container/flat_map.hpp) for any workload over ~250 elements.
-Beats std::map with full optimizations enabled.
+Beats [std::map](https://en.cppreference.com/w/cpp/container/map) with full optimizations enabled.
 
 ## Table of Contents
 
@@ -13,8 +13,14 @@ Beats std::map with full optimizations enabled.
 
 ## Implementation
 
-This flat map uses a vector to store the tree nodes, and maintains an approximate [heap](https://en.wikipedia.org/wiki/Heap_(data_structure)#:~:text=In%20computer%20science%2C%20a%20heap,The%20node%20at%20the%20%22top%22) structure for a cache optimized [binary search](https://en.wikipedia.org/wiki/Binary_search#:~:text=Binary%20search%20compares%20the%20target,the%20target%20value%20is%20found.). In
+This flat map uses a vector to store the tree nodes, and maintains an approximate [heap](<https://en.wikipedia.org/wiki/Heap_(data_structure)#:~:text=In%20computer%20science%2C%20a%20heap,The%20node%20at%20the%20%22top%22>) structure for a cache optimized [binary search](https://en.wikipedia.org/wiki/Binary_search#:~:text=Binary%20search%20compares%20the%20target,the%20target%20value%20is%20found.). In
 order to validate the correctness of the balancing algorithm, a full tree traversal is performed comparing the flat map to the STL Tree implementation.
+
+## *Beta Testing*
+
+ToDo:
+- [ ] 100% code coverage - currently ~50%.
+- [ ] Full support for "copy only" and "move only" keys and values
 
 ## Usage
 
@@ -185,11 +191,18 @@ Some points to note:
 These benchmarks were taken on a (4) core Intel(R) Core(TM) i5-9300H CPU @ 2.40GHz with isolcpus on cores 2 and 3.
 The linux kernel is v6.10.11-200.fc40.x86_64 and compiled with gcc version 14.2.1.
 
+Most important aspects of benchmarking:
+- Have at least one core isolated with isolcpus enabled in Grub.
+- Compile with -DCMAKE_BUILD_TYPE=Release
+- Use optimal size template parameter for dro::FlatMap. e.g. for a size of 10,000 specify an uint16_t.
+
 <img src="https://raw.githubusercontent.com/drogalis/Flat-Map-RB-Tree/refs/heads/main/assets/Average%20Random%20Insertion%20Time.png" alt="Average Random Insertion Time" style="padding-top: 10px;">
 
 <img src="https://raw.githubusercontent.com/drogalis/Flat-Map-RB-Tree/refs/heads/main/assets/Average%20Random%20Deletion%20Time.png" alt="Average Random Insertion Time" style="padding-top: 10px;">
 
 ## Installing
+
+**Required C++20 or higher.**
 
 To build and install the shared library, run the commands below.
 
