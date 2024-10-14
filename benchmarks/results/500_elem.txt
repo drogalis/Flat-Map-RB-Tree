@@ -10,5 +10,9 @@ Boost FlatMap:
 Mean insertion time: 110 ns.
 Mean find time: 42 ns.
 Mean Erase time: 106 ns.
+Folly heap_vector_map: 
+Mean insertion time: 687 ns.
+Mean find time: 40 ns.
+Mean erase time: 673 ns.
 
 

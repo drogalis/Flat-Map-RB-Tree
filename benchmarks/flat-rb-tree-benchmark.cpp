@@ -5,17 +5,22 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 
-#include "dro/flat-rb-tree.hpp"
-#include <chrono>
-#include <cstdint>
+#include <chrono> // for high_resolution_clock, nanoseconds
+#include <cstdint>// for uint32_t
 #include <cstdlib>
 #include <iostream>
 #include <map>
 #include <random>
 #include <vector>
 
+#include "dro/flat-rb-tree.hpp"
+
 #if __has_include(<boost/container/flat_map.hpp> )
 #include <boost/container/flat_map.hpp>
+#endif
+
+#if __has_include(<folly/container/heap_vector_types.h> )
+#include <folly/container/heap_vector_types.h>
 #endif
 
 struct alignas(4) Test {
@@ -158,6 +163,54 @@ int main() {
   // Remove Benchmark
   start = std::chrono::high_resolution_clock::now();
   for (auto i : randInts) { boost_.erase(Test(i)); }
+  stop = std::chrono::high_resolution_clock::now();
+
+  std::cout << "Mean erase time: "
+            << std::chrono::duration_cast<std::chrono::nanoseconds>(stop -
+                                                                    start)
+                       .count() /
+                   iterations
+
+            << " ns.\n";
+
+#endif
+
+#if __has_include(<folly/container/heap_vector_types.h>)
+
+  std::cout << "Folly heap_vector_map: \n";
+
+  // Insertion Benchmark
+  folly::heap_vector_map<Test, Test> folly_;
+  start = std::chrono::high_resolution_clock::now();
+  for (auto i : randInts) { folly_.emplace(Test(i), Test(i)); }
+  stop = std::chrono::high_resolution_clock::now();
+
+  std::cout << "Mean insertion time: "
+            << std::chrono::duration_cast<std::chrono::nanoseconds>(stop -
+                                                                    start)
+                       .count() /
+                   iterations
+            << " ns.\n";
+
+  // Find Benchmark
+  idx   = 0;
+  start = std::chrono::high_resolution_clock::now();
+  for (auto i : randInts) {
+    findKeys[idx] = *(folly_.find(Test(i)));
+    ++idx;
+  }
+  stop = std::chrono::high_resolution_clock::now();
+
+  std::cout << "Mean find time: "
+            << std::chrono::duration_cast<std::chrono::nanoseconds>(stop -
+                                                                    start)
+                       .count() /
+                   iterations
+            << " ns.\n";
+
+  // Remove Benchmark
+  start = std::chrono::high_resolution_clock::now();
+  for (auto i : randInts) { folly_.erase(Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Mean erase time: "
