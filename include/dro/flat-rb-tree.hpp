@@ -381,42 +381,48 @@ public:
   }
 
   iterator erase(iterator pos) {
+    if (pos == end()) {
+      return end();
+    }
     key_type key = tree_[pos.index_].pair_.first;
-    _erase(key);
-    return upper_bound(key);
+    return iterator(this, _erase(key).second);
   }
 
   iterator erase(const_iterator pos) {
+    if (pos == cend()) {
+      return end();
+    }
     key_type key = tree_[pos.index_].pair_.first;
-    _erase(key);
-    return upper_bound(key);
+    return iterator(this, _erase(key).second);
   }
 
   iterator erase(iterator first, iterator last) {
     key_type key;
-    for (; first != last; ++first) {
-      key = tree_[first.index_].pair_.first;
-      _erase(key);
+    size_type upperIndex = empty_index_;
+    for (; first != last && first != end(); ++first) {
+      key        = tree_[first.index_].pair_.first;
+      upperIndex = _erase(key).second;
     }
-    return upper_bound(key);
+    return iterator(this, upperIndex);
   }
 
   iterator erase(const_iterator first, const_iterator last) {
     key_type key;
-    for (; first != last; ++first) {
-      key = tree_[first.index_].pair_.first;
-      _erase(key);
+    size_type upperIndex = empty_index_;
+    for (; first != last && first != cend(); ++first) {
+      key        = tree_[first.index_].pair_.first;
+      upperIndex = _erase(key).second;
     }
-    return upper_bound(key);
+    return iterator(this, upperIndex);
   }
 
-  size_type erase(const key_type& key) { return _erase(key); }
+  size_type erase(const key_type& key) { return _erase(key).first; }
 
   template <typename K>
   size_type erase(K&& x)
     requires std::is_convertible_v<K, key_type>
   {
-    return _erase(x);
+    return _erase(x).first;
   }
 
   void swap(FlatRBTree& other) noexcept(FlatTree_NoThrow<Key> &&
@@ -657,11 +663,16 @@ private:
     }
   }
 
-  bool _erase(key_type key) {
+  std::pair<bool, size_type> _erase(key_type key) {
     size_type eraseIndex = _findIndex(key);
     if (eraseIndex == empty_index_) {
-      return false;
+      return {false, empty_index_};
     }
+    // For return iterator
+    size_type upperIndex   = _next(eraseIndex);
+    const bool largestElem = (upperIndex == empty_index_);
+    upperIndex             = largestElem ? size_ - 1 : upperIndex;
+    // Erase Node
     auto& eraseRef   = tree_[eraseIndex];
     bool color       = eraseRef.color_;
     size_type parent = eraseRef.parent_;
@@ -675,7 +686,7 @@ private:
       }
       _updateParent(child, eraseRef.parent_);
       _updateParentChild(child, parent, eraseIndex);
-      _swapOutOfTree(child, eraseIndex, child, parent);
+      _swapOutOfTree(child, eraseIndex, child, parent, upperIndex);
       // Both children full
     } else {
       size_type minNode = _minValueNode(eraseIndex);
@@ -694,13 +705,13 @@ private:
       _updateParentChild(minNode, eraseRef.parent_, eraseIndex);
       tree_[eraseRef.left_].parent_ = minNode;
       _updateParent(eraseRef.right_, minNode);
-      _swapOutOfTree(minNode, eraseIndex, child, parent);
+      _swapOutOfTree(minNode, eraseIndex, child, parent, upperIndex);
     }
     if (color == BLACK_) {
-      _fixErase(child, parent);
+      _fixErase(child, parent, upperIndex);
     }
     --size_;
-    return true;
+    return {true, largestElem ? empty_index_ : upperIndex};
   }
 
   size_type _findIndex(key_type key) const {
@@ -739,7 +750,7 @@ private:
     // Find node with binary search
     while (node != empty_index_) {
       auto& nodeRef = tree_[node];
-      //_prefetchBinarySearch(nodeRef);
+      _prefetchBinarySearch(nodeRef);
       bool compare = (key_compare()(nodeRef.pair_.first, key) ||
                       nodeRef.pair_.first == key);
       lastNode     = compare ? lastNode : node;
@@ -839,7 +850,8 @@ private:
     uncleRef.color_       = BLACK_;
   }
 
-  void _fixErase(size_type node, size_type parent) {
+  void _fixErase(size_type node, size_type parent, size_type& upperIndex) {
+    key_type upperKey = tree_[upperIndex].pair_.first;
     size_type sibling = empty_index_;
     while (node != root_ &&
            (node == empty_index_ || tree_[node].color_ == BLACK_)) {
@@ -849,6 +861,9 @@ private:
       // Analyze Sibling
       sibling = (isLeftTree) ? parentRef.right_ : parentRef.left_;
       _checkSiblingRed(sibling, parent, isLeftTree);
+      if (parent != empty_index_ && tree_[parent].pair_.first == upperKey) {
+        upperIndex = parent;
+      }
       auto& siblingRef = tree_[sibling];
       if (_checkSiblingChildColor(siblingRef, node, parent)) {
         // Fix Side of Tree
@@ -859,6 +874,9 @@ private:
         } else {
           _fixEraseRightTree(siblingRef, sibling, parent);
           _rotateRight(parent);
+        }
+        if (sibling != empty_index_ && tree_[sibling].pair_.first == upperKey) {
+          upperIndex = sibling;
         }
         node = root_;
         break;
@@ -1041,18 +1059,23 @@ private:
   }
 
   void _swapOutOfTree(size_type node, size_type removeNode, size_type& child,
-                      size_type& parent) {
+                      size_type& parent, size_type& upperIndex) {
     if (node != empty_index_) {
-      _swapNodePositionRemove(node, removeNode, child, parent);
+      _swapNodePositionRemove(node, removeNode, child, parent, upperIndex);
       removeNode = node;
     }
-    _swapNodePositionRemove(size_ - 1, removeNode, child, parent);
+    _swapNodePositionRemove(size_ - 1, removeNode, child, parent, upperIndex);
   }
 
   void _swapNodePositionRemove(size_type nodeA, size_type nodeB,
-                               size_type& child, size_type& parent) {
+                               size_type& child, size_type& parent,
+                               size_type& upperIndex) {
     if (nodeA == nodeB) {
       return;
+    }
+    // Update upperIndex for return iterator
+    if (tree_[nodeA].pair_.first == tree_[upperIndex].pair_.first) {
+      upperIndex = nodeB;
     }
     // Update child and parent index for erase method
     if (nodeA == child) {
@@ -1116,7 +1139,7 @@ private:
   }
 
   size_type _next(size_type node) const {
-    if (node == size_ - 1 || node == empty_index_) {
+    if (node == empty_index_) {
       return empty_index_;
     }
     if (tree_[node].right_ != empty_index_) {
@@ -1131,11 +1154,14 @@ private:
            node == tree_[parent].right_) {
       node = parent;
     }
+    if (parent == root_ && node == tree_[parent].right_) {
+      return empty_index_;
+    }
     return parent;
   }
 
   size_type _prev(size_type node) const {
-    if (node == size_ - 1 || node == empty_index_) {
+    if (node == empty_index_) {
       return empty_index_;
     }
     if (tree_[node].left_ != empty_index_) {
@@ -1149,6 +1175,9 @@ private:
     while ((parent = tree_[node].parent_) && parent != empty_index_ &&
            node == tree_[parent].left_) {
       node = parent;
+    }
+    if (parent == root_ && node == tree_[parent].left_) {
+      return empty_index_;
     }
     return parent;
   }
