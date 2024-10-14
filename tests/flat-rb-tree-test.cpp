@@ -31,14 +31,34 @@ template <typename T> struct TreeBuilder {
   std::string error_message;
 
   void insert(T key) {
-    droRBTree.insert(key);
+    auto iter = droRBTree.insert(key).first;
+    if (*iter != key) {
+      throw std::logic_error("Insert Iterator is not correct");
+    }
     gccRBTree._M_emplace_unique(key);
     validateTree();
   }
 
   void erase(T key) {
-    droRBTree.erase(key);
-    gccRBTree.erase(key);
+    auto iterDroFind = droRBTree.find(key);
+    auto iterGccFind = gccRBTree.find(key);
+    if (iterDroFind == droRBTree.end()) {
+      if (iterGccFind != gccRBTree.end()) {
+        throw std::logic_error("Find Iterator is not correct");
+      }
+      return;
+    }
+    auto droIter = droRBTree.erase(iterDroFind);
+    auto gccIter = gccRBTree.erase(iterGccFind);
+    if (droIter == droRBTree.end()) {
+      if (gccIter != gccRBTree.end()) {
+        throw std::logic_error("Erase Iterator is not correct");
+      }
+      return;
+    }
+    if (*droIter != *gccIter) {
+      throw std::logic_error("Erase Iterator is not correct");
+    }
     validateTree();
   }
 
@@ -158,7 +178,7 @@ int main() {
         rbTree.erase(rd);
       }
       for (int i {}; i < iters; ++i) { rbTree.erase(i); }
-    // Print Error and Terminate
+      // Print Error and Terminate
     } catch (std::logic_error& e) {
       std::cerr << "Test Terminated with error: " << e.what() << "\n";
       return 1;
