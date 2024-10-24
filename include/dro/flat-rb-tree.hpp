@@ -384,24 +384,27 @@ public:
     if (pos == end()) {
       return end();
     }
-    key_type key = tree_[pos.index_].pair_.first;
-    return iterator(this, _erase(key).second);
+    size_type index = pos.index_;
+    key_type key    = tree_[index].pair_.first;
+    return iterator(this, _erase(key, index).second);
   }
 
   iterator erase(const_iterator pos) {
     if (pos == cend()) {
       return end();
     }
-    key_type key = tree_[pos.index_].pair_.first;
-    return iterator(this, _erase(key).second);
+    size_type index = pos.index_;
+    key_type key    = tree_[index].pair_.first;
+    return iterator(this, _erase(key, index).second);
   }
 
   iterator erase(iterator first, iterator last) {
     key_type key;
     size_type upperIndex = empty_index_;
     for (; first != last && first != end(); ++first) {
-      key        = tree_[first.index_].pair_.first;
-      upperIndex = _erase(key).second;
+      size_type index = first.index_;
+      key             = tree_[index].pair_.first;
+      upperIndex      = _erase(key, index).second;
     }
     return iterator(this, upperIndex);
   }
@@ -410,8 +413,9 @@ public:
     key_type key;
     size_type upperIndex = empty_index_;
     for (; first != last && first != cend(); ++first) {
-      key        = tree_[first.index_].pair_.first;
-      upperIndex = _erase(key).second;
+      size_type index = first.index_;
+      key             = tree_[index].pair_.first;
+      upperIndex      = _erase(key, index).second;
     }
     return iterator(this, upperIndex);
   }
@@ -663,8 +667,9 @@ private:
     }
   }
 
-  std::pair<bool, size_type> _erase(key_type key) {
-    size_type eraseIndex = _findIndex(key);
+  std::pair<bool, size_type> _erase(key_type key,
+                                    size_type index = empty_index_) {
+    size_type eraseIndex = (index == empty_index_) ? _findIndex(key) : index;
     if (eraseIndex == empty_index_) {
       return {false, empty_index_};
     }
