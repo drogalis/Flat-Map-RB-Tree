@@ -217,7 +217,11 @@ private:
   constexpr static size_type empty_index_ =
       std::numeric_limits<size_type>::max();
 
-  size_type root_ = empty_index_;
+  size_type root_            = empty_index_;
+  size_type firstIndexCache_ = empty_index_;
+  size_type lastIndexCache_  = empty_index_;
+  key_type firstKeyCache_ {};
+  key_type lastKeyCache_ {};
   std::vector<node_type> tree_;
 
 public:
@@ -376,8 +380,17 @@ public:
   }
 
   template <typename... Args>
-  std::pair<iterator, bool> emplace(Args&&... args) {
+  std::pair<iterator, bool> emplace(Args&&... args)
+    requires(! std::is_same_v<mapped_type, FlatSetEmptyType>)
+  {
     return _emplace(std::forward<Args>(args)...);
+  }
+
+  template <typename... Args>
+  std::pair<iterator, bool> emplace(Args&&... args)
+    requires std::is_same_v<mapped_type, FlatSetEmptyType>
+  {
+    return _emplaceSet(std::forward<Args>(args)...);
   }
 
   iterator erase(iterator pos) {
@@ -575,11 +588,11 @@ private:
   template <typename K, typename... Args>
   std::pair<iterator, bool> _emplace(const K& key, Args&&... args)
     requires(std::is_convertible_v<K, key_type> &&
-             ! std::is_same_v<mapped_type, FlatSetEmptyType> &&
              std::is_constructible_v<mapped_type, Args...>)
   {
     _validateSize();
     size_type insertIndex = size_;
+    auto isExtrema        = _checkCachedExtrema(key);
     auto insertResult     = _findInsertLocation(key);
     if (! insertResult.second) {
       return {iterator(this, insertResult.first), false};
@@ -603,44 +616,39 @@ private:
     }
     _insertUpdateParentRoot(key, parent, insertIndex);
     insertIndex = _fixInsert(insertIndex, key);
+    _updateCachedExtrema(key, insertIndex);
     return {iterator(this, insertIndex), true};
   }
 
   // Overload For FlatSet
   template <typename... Args>
-  std::pair<iterator, bool> _emplace(Args&&... args)
+  std::pair<iterator, bool> _emplaceSet(Args&&... args)
     requires(std::is_same_v<mapped_type, FlatSetEmptyType> &&
              std::is_constructible_v<key_type, Args...>)
   {
-    _validateSize();
-    size_type insertIndex = size_;
-    key_type key          = key_type(std::forward<Args...>(args)...);
-    auto insertResult     = _findInsertLocation(key);
-    if (! insertResult.second) {
-      return {iterator(this, insertResult.first), false};
-    }
-    // Create Node in the end of the tree
-    size_type parent = insertResult.first;
-    _resizeTree();
-    auto& newNodeRef       = tree_[size_];
-    newNodeRef.pair_.first = key_type(std::forward<Args...>(args)...);
-    newNodeRef.parent_     = parent;
-    newNodeRef.left_       = empty_index_;
-    newNodeRef.right_      = empty_index_;
-    newNodeRef.color_      = RED_;
-    ++size_;
-    // Update root_
-    if (! insertIndex) {
-      root_               = insertIndex;
-      tree_[root_].color_ = BLACK_;
-      return {iterator(this, insertIndex), true};
-    }
-    _insertUpdateParentRoot(key, parent, insertIndex);
-    insertIndex = _fixInsert(insertIndex, newNodeRef.pair_.first);
-    return {iterator(this, insertIndex), true};
+    key_type key = key_type(std::forward<Args...>(args)...);
+    return _emplace(key);
   }
 
-  std::pair<size_type, bool> _findInsertLocation(key_type key) {
+  std::pair<size_type, bool> _checkCachedExtrema(const key_type& key) {
+    // TBD
+    return {1, false};
+  }
+
+  void _updateCachedExtrema(const key_type& key, size_type insertIndex) {
+    if (firstIndexCache_ == empty_index_ ||
+        key_compare()(key, firstKeyCache_)) {
+      firstKeyCache_   = key;
+      firstIndexCache_ = insertIndex;
+    }
+    if (lastIndexCache_ == empty_index_ ||
+        ! key_compare()(key, lastKeyCache_)) {
+      lastKeyCache_   = key;
+      lastIndexCache_ = insertIndex;
+    }
+  }
+
+  std::pair<size_type, bool> _findInsertLocation(const key_type& key) {
     size_type node   = root_;
     size_type parent = empty_index_;
     while (node != empty_index_) {
@@ -657,7 +665,7 @@ private:
     return {parent, true};
   }
 
-  void _insertUpdateParentRoot(key_type key, size_type parent,
+  void _insertUpdateParentRoot(const key_type& key, size_type parent,
                                size_type insertIndex) {
     auto& parentRef = tree_[parent];
     if (key_compare()(key, parentRef.pair_.first)) {
@@ -667,16 +675,19 @@ private:
     }
   }
 
-  std::pair<bool, size_type> _erase(key_type key,
+  std::pair<bool, size_type> _erase(const key_type& key,
                                     size_type index = empty_index_) {
     size_type eraseIndex = (index == empty_index_) ? _findIndex(key) : index;
     if (eraseIndex == empty_index_) {
       return {false, empty_index_};
     }
     // For return iterator
-    size_type upperIndex   = _next(eraseIndex);
-    const bool largestElem = (upperIndex == empty_index_);
-    upperIndex             = largestElem ? size_ - 1 : upperIndex;
+    size_type upperIndex    = _next(eraseIndex);
+    size_type lowerIndex    = _prev(eraseIndex);
+    const bool largestElem  = (upperIndex == empty_index_);
+    const bool smallestElem = (lowerIndex == empty_index_);
+    upperIndex              = largestElem ? size_ - 1 : upperIndex;
+    lowerIndex              = smallestElem ? size_ - 1 : lowerIndex;
     // Erase Node
     auto& eraseRef   = tree_[eraseIndex];
     bool color       = eraseRef.color_;
@@ -719,7 +730,7 @@ private:
     return {true, largestElem ? empty_index_ : upperIndex};
   }
 
-  size_type _findIndex(key_type key) const {
+  size_type _findIndex(const key_type& key) const {
     size_type node = root_;
     // Find node with binary search
     while (node != empty_index_) {
@@ -749,7 +760,7 @@ private:
     }
   }
 
-  size_type _upperBound(key_type key) const {
+  size_type _upperBound(const key_type& key) const {
     size_type node     = root_;
     size_type lastNode = empty_index_;
     // Find node with binary search
@@ -764,7 +775,7 @@ private:
     return lastNode;
   }
 
-  size_type _lowerBound(key_type key) const {
+  size_type _lowerBound(const key_type& key) const {
     size_type node     = root_;
     size_type lastNode = empty_index_;
     // Find node with binary search
@@ -804,7 +815,7 @@ private:
     }
   }
 
-  size_type _fixInsert(size_type node, key_type key) {
+  size_type _fixInsert(size_type node, const key_type& key) {
     size_type baseNode = node;
     while (node != root_ && tree_[tree_[node].parent_].color_ == RED_) {
       size_type parent      = tree_[node].parent_;
@@ -1132,6 +1143,7 @@ private:
       while ((left = tree_[node].left_) != empty_index_) { node = left; }
     }
     return node;
+    // return firstIndexCache_;
   }
 
   size_type _last() const {
@@ -1141,6 +1153,7 @@ private:
       while ((right = tree_[node].right_) != empty_index_) { node = right; }
     }
     return node;
+    // return lastIndexCache_;
   }
 
   size_type _next(size_type node) const {
