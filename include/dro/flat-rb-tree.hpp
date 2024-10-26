@@ -220,8 +220,6 @@ private:
   size_type root_            = empty_index_;
   size_type firstIndexCache_ = empty_index_;
   size_type lastIndexCache_  = empty_index_;
-  key_type firstKeyCache_ {};
-  key_type lastKeyCache_ {};
   std::vector<node_type> tree_;
 
 public:
@@ -321,7 +319,7 @@ public:
     return const_iterator(this, _last(), true);
   }
 
-  iterator rend() { return iterator(*this, empty_index_, true); }
+  iterator rend() { return iterator(this, empty_index_, true); }
 
   const_iterator rend() const {
     return const_iterator(this, empty_index_, true);
@@ -351,8 +349,10 @@ public:
 
   // Modifiers
   void clear() noexcept {
-    root_ = empty_index_;
-    size_ = 0;
+    firstIndexCache_ = empty_index_;
+    lastIndexCache_  = empty_index_;
+    root_            = empty_index_;
+    size_            = 0;
   }
 
   std::pair<iterator, bool> insert(const value_type& pair)
@@ -588,12 +588,14 @@ private:
   template <typename K, typename... Args>
   std::pair<iterator, bool> _emplace(const K& key, Args&&... args)
     requires(std::is_convertible_v<K, key_type> &&
-             std::is_constructible_v<mapped_type, Args...>)
+             std::is_constructible_v<mapped_type, Args && ...>)
   {
     _validateSize();
     size_type insertIndex = size_;
-    auto isExtrema        = _checkCachedExtrema(key);
-    auto insertResult     = _findInsertLocation(key);
+    size_type extremaCase {};
+    auto isExtrema = _checkCachedExtrema(key, extremaCase);
+    auto insertResult =
+        (! isExtrema.second) ? _findInsertLocation(key) : isExtrema;
     if (! insertResult.second) {
       return {iterator(this, insertResult.first), false};
     }
@@ -602,7 +604,7 @@ private:
     _resizeTree();
     auto& newNodeRef        = tree_[size_];
     newNodeRef.pair_.first  = key;
-    newNodeRef.pair_.second = mapped_type(std::forward<Args...>(args)...);
+    newNodeRef.pair_.second = mapped_type(std::forward<Args>(args)...);
     newNodeRef.parent_      = parent;
     newNodeRef.left_        = empty_index_;
     newNodeRef.right_       = empty_index_;
@@ -612,11 +614,12 @@ private:
     if (! insertIndex) {
       root_               = insertIndex;
       tree_[root_].color_ = BLACK_;
+      _insertUpdateCachedExtrema(extremaCase, insertIndex);
       return {iterator(this, insertIndex), true};
     }
     _insertUpdateParentRoot(key, parent, insertIndex);
     insertIndex = _fixInsert(insertIndex, key);
-    _updateCachedExtrema(key, insertIndex);
+    _insertUpdateCachedExtrema(extremaCase, insertIndex);
     return {iterator(this, insertIndex), true};
   }
 
@@ -624,26 +627,33 @@ private:
   template <typename... Args>
   std::pair<iterator, bool> _emplaceSet(Args&&... args)
     requires(std::is_same_v<mapped_type, FlatSetEmptyType> &&
-             std::is_constructible_v<key_type, Args...>)
+             std::is_constructible_v<key_type, Args && ...>)
   {
-    key_type key = key_type(std::forward<Args...>(args)...);
+    key_type key = key_type(std::forward<Args>(args)...);
     return _emplace(key);
   }
 
-  std::pair<size_type, bool> _checkCachedExtrema(const key_type& key) {
-    // TBD
-    return {1, false};
+  std::pair<size_type, bool> _checkCachedExtrema(const key_type& key,
+                                                 size_type& extremaCase) {
+    if (firstIndexCache_ != empty_index_ &&
+        key_compare()(key, tree_[firstIndexCache_].pair_.first)) {
+      extremaCase = 2;
+      return {firstIndexCache_, true};
+    }
+    if (lastIndexCache_ != empty_index_ &&
+        key_compare()(tree_[lastIndexCache_].pair_.first, key)) {
+      extremaCase = 1;
+      return {lastIndexCache_, true};
+    }
+    return {empty_index_, false};
   }
 
-  void _updateCachedExtrema(const key_type& key, size_type insertIndex) {
-    if (firstIndexCache_ == empty_index_ ||
-        key_compare()(key, firstKeyCache_)) {
-      firstKeyCache_   = key;
+  void _insertUpdateCachedExtrema(size_type extremaCase,
+                                  size_type insertIndex) {
+    if (firstIndexCache_ == empty_index_ || extremaCase == 2) {
       firstIndexCache_ = insertIndex;
     }
-    if (lastIndexCache_ == empty_index_ ||
-        ! key_compare()(key, lastKeyCache_)) {
-      lastKeyCache_   = key;
+    if (lastIndexCache_ == empty_index_ || extremaCase == 1) {
       lastIndexCache_ = insertIndex;
     }
   }
@@ -702,7 +712,7 @@ private:
       }
       _updateParent(child, eraseRef.parent_);
       _updateParentChild(child, parent, eraseIndex);
-      _swapOutOfTree(child, eraseIndex, child, parent, upperIndex);
+      _swapOutOfTree(child, eraseIndex, child, parent, upperIndex, lowerIndex);
       // Both children full
     } else {
       size_type minNode = _minValueNode(eraseIndex);
@@ -721,13 +731,18 @@ private:
       _updateParentChild(minNode, eraseRef.parent_, eraseIndex);
       tree_[eraseRef.left_].parent_ = minNode;
       _updateParent(eraseRef.right_, minNode);
-      _swapOutOfTree(minNode, eraseIndex, child, parent, upperIndex);
+      _swapOutOfTree(minNode, eraseIndex, child, parent, upperIndex,
+                     lowerIndex);
     }
     if (color == BLACK_) {
-      _fixErase(child, parent, upperIndex);
+      _fixErase(child, parent, upperIndex, lowerIndex);
     }
+    upperIndex       = largestElem ? empty_index_ : upperIndex;
+    lowerIndex       = smallestElem ? empty_index_ : lowerIndex;
+    firstIndexCache_ = smallestElem ? upperIndex : firstIndexCache_;
+    lastIndexCache_  = largestElem ? lowerIndex : lastIndexCache_;
     --size_;
-    return {true, largestElem ? empty_index_ : upperIndex};
+    return {true, upperIndex};
   }
 
   size_type _findIndex(const key_type& key) const {
@@ -866,8 +881,11 @@ private:
     uncleRef.color_       = BLACK_;
   }
 
-  void _fixErase(size_type node, size_type parent, size_type& upperIndex) {
+  void _fixErase(size_type node, size_type parent, size_type& upperIndex,
+                 size_type& lowerIndex) {
+    // Cannot be a reference
     key_type upperKey = tree_[upperIndex].pair_.first;
+    key_type lowerKey = tree_[lowerIndex].pair_.first;
     size_type sibling = empty_index_;
     while (node != root_ &&
            (node == empty_index_ || tree_[node].color_ == BLACK_)) {
@@ -879,6 +897,9 @@ private:
       _checkSiblingRed(sibling, parent, isLeftTree);
       if (parent != empty_index_ && tree_[parent].pair_.first == upperKey) {
         upperIndex = parent;
+      }
+      if (parent != empty_index_ && tree_[parent].pair_.first == lowerKey) {
+        lowerIndex = parent;
       }
       auto& siblingRef = tree_[sibling];
       if (_checkSiblingChildColor(siblingRef, node, parent)) {
@@ -893,6 +914,9 @@ private:
         }
         if (sibling != empty_index_ && tree_[sibling].pair_.first == upperKey) {
           upperIndex = sibling;
+        }
+        if (sibling != empty_index_ && tree_[sibling].pair_.first == lowerKey) {
+          lowerIndex = sibling;
         }
         node = root_;
         break;
@@ -972,6 +996,8 @@ private:
     auto& nodeRef   = tree_[node];
     size_type child = nodeRef.right_;
     auto& childRef  = tree_[child];
+    // Update Cached Extrema
+    _updateExtrema(node, child);
     // Update Children
     size_type childRight = childRef.right_;
     if (childRight != empty_index_) {
@@ -995,6 +1021,8 @@ private:
     auto& nodeRef   = tree_[node];
     size_type child = tree_[node].left_;
     auto& childRef  = tree_[child];
+    // Update Cached Extrema
+    _updateExtrema(node, child);
     // Update Children
     size_type childLeft = childRef.left_;
     if (childLeft != empty_index_) {
@@ -1014,10 +1042,24 @@ private:
     return child;
   }
 
+  void _updateExtrema(size_type nodeA, size_type nodeB) {
+    if (nodeA == firstIndexCache_) {
+      firstIndexCache_ = nodeB;
+    } else if (nodeB == firstIndexCache_) {
+      firstIndexCache_ = nodeA;
+    }
+    if (nodeA == lastIndexCache_) {
+      lastIndexCache_ = nodeB;
+    } else if (nodeB == lastIndexCache_) {
+      lastIndexCache_ = nodeA;
+    }
+  }
+
   void _swapNodePosition(size_type nodeA, size_type nodeB) {
     if (nodeA == nodeB) {
       return;
     }
+    _updateExtrema(nodeA, nodeB);
     // Saves computation time (~3-4 nanoseconds)
     auto& nodeARef        = tree_[nodeA];
     auto& nodeBRef        = tree_[nodeB];
@@ -1075,23 +1117,30 @@ private:
   }
 
   void _swapOutOfTree(size_type node, size_type removeNode, size_type& child,
-                      size_type& parent, size_type& upperIndex) {
+                      size_type& parent, size_type& upperIndex,
+                      size_type& lowerIndex) {
     if (node != empty_index_) {
-      _swapNodePositionRemove(node, removeNode, child, parent, upperIndex);
+      _swapNodePositionRemove(node, removeNode, child, parent, upperIndex,
+                              lowerIndex);
       removeNode = node;
     }
-    _swapNodePositionRemove(size_ - 1, removeNode, child, parent, upperIndex);
+    _swapNodePositionRemove(size_ - 1, removeNode, child, parent, upperIndex,
+                            lowerIndex);
   }
 
   void _swapNodePositionRemove(size_type nodeA, size_type nodeB,
                                size_type& child, size_type& parent,
-                               size_type& upperIndex) {
+                               size_type& upperIndex, size_type& lowerIndex) {
     if (nodeA == nodeB) {
       return;
     }
+    _updateExtrema(nodeA, nodeB);
     // Update upperIndex for return iterator
     if (tree_[nodeA].pair_.first == tree_[upperIndex].pair_.first) {
       upperIndex = nodeB;
+    }
+    if (tree_[nodeA].pair_.first == tree_[lowerIndex].pair_.first) {
+      lowerIndex = nodeB;
     }
     // Update child and parent index for erase method
     if (nodeA == child) {
@@ -1136,25 +1185,9 @@ private:
     return node;
   }
 
-  size_type _first() const {
-    size_type node = root_;
-    if (node != empty_index_) {
-      size_type left = empty_index_;
-      while ((left = tree_[node].left_) != empty_index_) { node = left; }
-    }
-    return node;
-    // return firstIndexCache_;
-  }
+  size_type _first() const { return firstIndexCache_; }
 
-  size_type _last() const {
-    size_type node = root_;
-    if (node != empty_index_) {
-      size_type right = empty_index_;
-      while ((right = tree_[node].right_) != empty_index_) { node = right; }
-    }
-    return node;
-    // return lastIndexCache_;
-  }
+  size_type _last() const { return lastIndexCache_; }
 
   size_type _next(size_type node) const {
     if (node == empty_index_) {
