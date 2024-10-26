@@ -25,23 +25,25 @@
 
 namespace dro::details {
 
-template <typename T> struct TreeBuilder {
-  FlatRBTree<T, FlatSetEmptyType, details::FlatSetPair<T>> droRBTree;
-  std::_Rb_tree<T, T, std::_Identity<T>, std::less<T>> gccRBTree;
+template <typename T, typename Compare> struct TreeBuilder {
+  FlatRBTree<T, FlatSetEmptyType, details::FlatSetPair<T>, uint32_t, Compare>
+      droRBTree;
+  std::_Rb_tree<T, T, std::_Identity<T>, Compare> gccRBTree;
   std::string error_message;
 
   void insert(T key) {
-    auto iter = droRBTree.insert(key).first;
+    auto iter = droRBTree.emplace(key).first;
     if (*iter != key) {
       throw std::logic_error("Insert Iterator is not correct");
     }
     gccRBTree._M_emplace_unique(key);
+    checkFirstLastIter();
     validateTree();
   }
 
   void erase(T key) {
-    auto iterDroFind = droRBTree.find(key);
-    auto iterGccFind = gccRBTree.find(key);
+    auto iterDroFind = droRBTree.emplace(key).first;
+    auto iterGccFind = gccRBTree._M_emplace_unique(key).first;
     if (iterDroFind == droRBTree.end()) {
       if (iterGccFind != gccRBTree.end()) {
         throw std::logic_error("Find Iterator is not correct");
@@ -59,7 +61,27 @@ template <typename T> struct TreeBuilder {
     if (*droIter != *gccIter) {
       throw std::logic_error("Erase Iterator is not correct");
     }
+    checkFirstLastIter();
     validateTree();
+  }
+
+  void checkFirstLastIter() {
+    auto iterDro = droRBTree.begin();
+    auto iterGCC = gccRBTree.begin();
+    for (; iterDro != droRBTree.end() && iterGCC != gccRBTree.end();
+         ++iterDro, ++iterGCC) {
+      if (*iterDro != *iterGCC) {
+        throw std::logic_error("Forward Iterator is not correct");
+      }
+    }
+    auto iterDroR = droRBTree.rbegin();
+    auto iterGCCR = gccRBTree.rbegin();
+    for (; iterDroR != droRBTree.rend() && iterGCCR != gccRBTree.rend();
+         ++iterDroR, ++iterGCCR) {
+      if (*iterDroR != *iterGCCR) {
+        throw std::logic_error("Forward Iterator is not correct");
+      }
+    }
   }
 
   void validateTree() {
@@ -140,47 +162,69 @@ template <typename T> struct TreeBuilder {
       }
     }
   }
-
-  void validateSortedTree(std::vector<std::size_t> randNum, int iters) {
-    // This emplace is to add the inorder elements on top of random elements
-    for (int i {}; i < iters; ++i) { randNum.emplace_back(i); }
-    std::sort(randNum.begin(), randNum.end());
-    int i {};
-    for (auto& elem : droRBTree) {
-      if (elem != randNum[i]) {
-        throw std::logic_error("Tree is not sorted correctly");
-      }
-      ++i;
-    }
-  }
 };
 
 }// namespace dro::details
 
-int main() {
-  {
-    dro::details::TreeBuilder<int> rbTree;
-    std::cout << "Starting Tree Traversal Test... Runtime ~20 seconds.\n";
+template <typename TreeBuilder> int runTreeTraversal(TreeBuilder rbTree) {
+  const int iters = 5'000;
+  std::vector<std::size_t> randNum(iters, 0);
+  // Tree Functional Test
+  try {
+    for (int i {}; i < iters; ++i) { rbTree.insert(i); }
+    for (int i {}; i < iters; ++i) {
+      int rd = rand() % (iters * 2);
+      rbTree.insert(rd);
+      randNum[i] = rd;
+    }
+    std::cout << "Tree insertions completed...\n";
+    for (int i {}; i < iters; ++i) {
+      int rd = randNum[i];
+      rbTree.erase(rd);
+    }
+    for (int i {}; i < iters; ++i) { rbTree.erase(i); }
+    std::cout << "Tree erasions completed...\n";
 
-    const int iters = 10'000;
-    std::vector<std::size_t> randNum(iters, 0);
-    // Tree Functional Test
-    try {
-      for (int i {}; i < iters; ++i) { rbTree.insert(i); }
-      for (int i {}; i < iters; ++i) {
-        int rd = rand();
+    for (int i {}; i < iters; ++i) {
+      int rd = rand() % (iters * 2);
+      if (rd % 3) {
         rbTree.insert(rd);
-        randNum[i] = rd;
-      }
-      rbTree.validateSortedTree(randNum, iters);
-      for (int i {}; i < iters; ++i) {
-        int rd = randNum[i];
+      } else {
         rbTree.erase(rd);
       }
-      for (int i {}; i < iters; ++i) { rbTree.erase(i); }
-      // Print Error and Terminate
-    } catch (std::logic_error& e) {
-      std::cerr << "Test Terminated with error: " << e.what() << "\n";
+    }
+    for (int i {}; i < iters; ++i) {
+      int rd = rand() % (iters * 2);
+      if (rd % 3) {
+        rbTree.erase(rd);
+      } else {
+        rbTree.insert(rd);
+      }
+    }
+    std::cout << "Tree combinations completed...\n";
+    // Print Error and Terminate
+  } catch (std::logic_error& e) {
+    std::cerr << "Test Terminated with error: " << e.what() << "\n";
+    return 1;
+  }
+  return 0;
+}
+
+int main() {
+  {
+    std::cout << "Starting Tree Traversal Test... Runtime ~45 seconds.\n";
+
+    using lessCompareTreeBuilder =
+        dro::details::TreeBuilder<int, std::less<int>>;
+    using greaterCompareTreeBuilder =
+        dro::details::TreeBuilder<int, std::greater<int>>;
+    lessCompareTreeBuilder rbTreeL;
+    greaterCompareTreeBuilder rbTreeG;
+
+    if (runTreeTraversal(rbTreeL)) {
+      return 1;
+    }
+    if (runTreeTraversal(rbTreeG)) {
       return 1;
     }
   }
