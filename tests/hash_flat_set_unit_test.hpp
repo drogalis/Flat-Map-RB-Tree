@@ -1,11 +1,16 @@
-// Andrew Drogalis Copyright (c) 2024, GNU 3.0 Licence
+// Copyright (c) 2024-2025 Andrew Drogalis
 //
-// This library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.rogalis
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the “Software”), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
 
-#include "dro/flat-rb-tree.hpp"
+#include "dro/hash_flat_map.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -13,15 +18,12 @@
 #include <functional>
 #include <iostream>
 #include <iterator>
-#include <random>
-#include <string>
-#include <vector>
 
-void runFlatSetTests() {
+void run_hash_flat_set_tests() {
 
   // Iterators
   {
-    dro::FlatSet<int> flatset(10);
+    dro::hash_flat_set<int> flatset(10);
     const auto& cflatset = flatset;
 
     assert(flatset.begin() == flatset.end());
@@ -47,7 +49,7 @@ void runFlatSetTests() {
 
   // Capacity
   {
-    dro::FlatSet<int> flatset(10);
+    dro::hash_flat_set<int> flatset(10);
     const auto& cflatset = flatset;
     assert(cflatset.empty());
     assert(cflatset.size() == 0);
@@ -59,7 +61,7 @@ void runFlatSetTests() {
 
   // Modifiers
   {
-    dro::FlatSet<int> flatset(10);
+    dro::hash_flat_set<int> flatset(10);
     flatset.insert(1);
     flatset.clear();
     assert(flatset.empty());
@@ -69,7 +71,7 @@ void runFlatSetTests() {
   }
 
   {
-    dro::FlatSet<int> flatset(10);
+    dro::hash_flat_set<int> flatset(10);
     auto res = flatset.insert(1);
     assert(! flatset.empty());
     assert(flatset.size() == 1);
@@ -86,7 +88,7 @@ void runFlatSetTests() {
   }
 
   {
-    dro::FlatSet<int> flatset(10);
+    dro::hash_flat_set<int> flatset(10);
     auto res = flatset.emplace(1);
     assert(! flatset.empty());
     assert(flatset.size() == 1);
@@ -103,7 +105,7 @@ void runFlatSetTests() {
   }
 
   {
-    dro::FlatSet<int> flatset(10);
+    dro::hash_flat_set<int> flatset(10);
     auto res = flatset.emplace(1);
     flatset.erase(res.first);
     assert(flatset.empty());
@@ -113,7 +115,7 @@ void runFlatSetTests() {
   }
 
   {
-    dro::FlatSet<int> flatset(10);
+    dro::hash_flat_set<int> flatset(10);
     assert(flatset.erase(1) == 0);
     flatset.insert(1);
     assert(flatset.erase(1) == 1);
@@ -124,7 +126,7 @@ void runFlatSetTests() {
   }
 
   {
-    dro::FlatSet<int> flatset1(10), flatset2(16);
+    dro::hash_flat_set<int> flatset1(10), flatset2(16);
     flatset1.insert(1);
     flatset2.swap(flatset1);
     assert(flatset1.empty());
@@ -139,7 +141,7 @@ void runFlatSetTests() {
   }
 
   {
-    dro::FlatSet<int> flatset(10);
+    dro::hash_flat_set<int> flatset(10);
     const auto& cflatset = flatset;
     flatset.insert(1);
     assert(flatset.count(1) == 1);
@@ -149,7 +151,7 @@ void runFlatSetTests() {
   }
 
   {
-    dro::FlatSet<int> flatset(10);
+    dro::hash_flat_set<int> flatset(10);
     const auto& cflatset = flatset;
     flatset.insert(1);
     {

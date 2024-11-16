@@ -1,9 +1,14 @@
-// Andrew Drogalis Copyright (c) 2024, GNU 3.0 Licence
+// Copyright (c) 2024-2025 Andrew Drogalis
 //
-// This library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the “Software”), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
 
 #include <chrono> // for high_resolution_clock, nanoseconds
 #include <cstdint>// for uint32_t
@@ -11,9 +16,10 @@
 #include <iostream>
 #include <map>
 #include <random>
+#include <stdexcept>
 #include <vector>
 
-#include "dro/flat-rb-tree.hpp"
+#include "dro/hash_flat_map.hpp"
 
 #if __has_include(<boost/container/flat_map.hpp> )
 #include <boost/container/flat_map.hpp>
@@ -31,19 +37,20 @@ struct alignas(4) Test {
 };
 
 int main() {
-  int iterations = 100'000;
+  int iterations = 100'00;
 
   // Generate Vector of Random Ints
   std::vector<int> randInts(iterations);
-  std::vector<std::pair<Test, Test>> findKeys(iterations);
+  std::vector<std::pair<int, int>> findKeys(iterations);
   for (auto& i : randInts) { i = rand(); }
 
-  std::cout << "Dro FlatMap: \n";
+  std::cout << "dro::hashed_flat_map: \n";
 
   // Insertion Benchmark
-  dro::FlatMap<Test, Test, uint32_t> dro_;
+  dro::hash_flat_map<int, int, uint32_t> dro_ {iterations * 2};
+
   auto start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { dro_.emplace(Test(i), Test(i)); }
+  for (const auto& i : randInts) { dro_.emplace(i, i); }
   auto stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Mean insertion time: "
@@ -56,8 +63,8 @@ int main() {
   // Find Benchmark
   int idx {};
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) {
-    findKeys[idx] = *(dro_.find(Test(i)));
+  for (const auto& i : randInts) {
+    findKeys[idx] = *(dro_.find(i));
     ++idx;
   }
   stop = std::chrono::high_resolution_clock::now();
@@ -71,7 +78,7 @@ int main() {
 
   // Remove Benchmark
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { dro_.erase(Test(i)); }
+  for (const auto& i : randInts) { dro_.erase(i); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Mean erase time: "
@@ -84,12 +91,12 @@ int main() {
 
   // ==============================================================================
 
-  std::cout << "STL Map: \n";
+  std::cout << "std::map: \n";
 
   // Insertion Benchmark
-  std::map<Test, Test> stl_;
+  std::map<int, int> stl_;
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { stl_.emplace(Test(i), Test(i)); }
+  for (const auto& i : randInts) { stl_.emplace(i, i); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Mean insertion time: "
@@ -102,8 +109,8 @@ int main() {
   // Find Benchmark
   idx   = 0;
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) {
-    findKeys[idx] = *(stl_.find(Test(i)));
+  for (const auto& i : randInts) {
+    findKeys[idx] = *(stl_.find(i));
     ++idx;
   }
   stop = std::chrono::high_resolution_clock::now();
@@ -117,7 +124,7 @@ int main() {
 
   // Remove Benchmark
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { stl_.erase(Test(i)); }
+  for (const auto& i : randInts) { stl_.erase(i); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Mean erase time: "
@@ -127,14 +134,14 @@ int main() {
                    iterations
             << " ns.\n";
 
-#if __has_include(<boost/container/flat_map.hpp>)
+#if __has_include(<boost/container/flat_map.hpp---->)
 
-  std::cout << "Boost FlatMap: \n";
+  std::cout << "boost::flat_map: \n";
 
   // Insertion Benchmark
   boost::container::flat_map<Test, Test> boost_;
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { boost_.emplace(Test(i), Test(i)); }
+  for (const auto& i : randInts) { boost_.emplace(Test(i), Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Mean insertion time: "
@@ -147,7 +154,7 @@ int main() {
   // Find Benchmark
   idx   = 0;
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) {
+  for (const auto& i : randInts) {
     findKeys[idx] = *(boost_.find(Test(i)));
     ++idx;
   }
@@ -162,7 +169,7 @@ int main() {
 
   // Remove Benchmark
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { boost_.erase(Test(i)); }
+  for (const auto& i : randInts) { boost_.erase(Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Mean erase time: "
@@ -177,12 +184,12 @@ int main() {
 
 #if __has_include(<folly/container/heap_vector_types.h>)
 
-  std::cout << "Folly heap_vector_map: \n";
+  std::cout << "folly::heap_vector_map: \n";
 
   // Insertion Benchmark
   folly::heap_vector_map<Test, Test> folly_;
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { folly_.emplace(Test(i), Test(i)); }
+  for (const auto& i : randInts) { folly_.emplace(Test(i), Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Mean insertion time: "
@@ -195,7 +202,7 @@ int main() {
   // Find Benchmark
   idx   = 0;
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) {
+  for (const auto& i : randInts) {
     findKeys[idx] = *(folly_.find(Test(i)));
     ++idx;
   }
@@ -210,7 +217,7 @@ int main() {
 
   // Remove Benchmark
   start = std::chrono::high_resolution_clock::now();
-  for (auto i : randInts) { folly_.erase(Test(i)); }
+  for (const auto& i : randInts) { folly_.erase(Test(i)); }
   stop = std::chrono::high_resolution_clock::now();
 
   std::cout << "Mean erase time: "

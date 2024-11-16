@@ -18,6 +18,7 @@
 #include <utility>    // for pair, forward
 #include <vector>     // for vector, allocator
 
+#include <iostream>
 namespace dro {
 
 namespace details {
@@ -691,6 +692,7 @@ private:
     if (eraseIndex == empty_index_) {
       return {false, empty_index_};
     }
+    std::cout << "old erase idx: " << eraseIndex << '\n';
     // For return iterator
     size_type upperIndex    = _next(eraseIndex);
     size_type lowerIndex    = _prev(eraseIndex);
@@ -736,6 +738,8 @@ private:
     }
     if (color == BLACK_) {
       _fixErase(child, parent, upperIndex, lowerIndex);
+    } else {
+      std::cout << "NO FIX\n";
     }
     upperIndex       = largestElem ? empty_index_ : upperIndex;
     lowerIndex       = smallestElem ? empty_index_ : lowerIndex;
@@ -894,7 +898,9 @@ private:
       bool isLeftTree = (node == parentRef.left_);
       // Analyze Sibling
       sibling = (isLeftTree) ? parentRef.right_ : parentRef.left_;
+      std::cout << parent << ' ' << sibling << "--- sib here\n";
       _checkSiblingRed(sibling, parent, isLeftTree);
+      std::cout << parent << ' ' << sibling << "--- sib here\n";
       if (parent != empty_index_ && tree_[parent].pair_.first == upperKey) {
         upperIndex = parent;
       }
@@ -922,6 +928,7 @@ private:
         break;
       }
     }
+    std::cout << "-- end\n";
     if (node != empty_index_) {
       tree_[node].color_ = BLACK_;
     }
@@ -933,12 +940,20 @@ private:
       tree_[sibling].color_ = BLACK_;
       tree_[parent].color_  = RED_;
       if (isLeftTree) {
+        std::cout << "_ltest: " << tree_[parent].parent_ << '\n';
+        std::cout << "_ltest: " << tree_[tree_[parent].parent_].left_ << '\n';
+        std::cout << "_ltest: " << tree_[tree_[parent].parent_].right_ << '\n';
         parent  = _rotateLeft(parent);
+        std::cout << "_ltest: " << tree_[parent].parent_ << '\n';
+        std::cout << "_ltest: " << tree_[tree_[parent].parent_].left_ << '\n';
+        std::cout << "_ltest: " << tree_[tree_[parent].parent_].right_ << '\n';
         sibling = tree_[parent].right_;
       } else {
         parent  = _rotateRight(parent);
         sibling = tree_[parent].left_;
       }
+    } else {
+      std::cout << "not\n";
     }
   }
 

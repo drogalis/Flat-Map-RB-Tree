@@ -3,7 +3,7 @@
 # ==============================================================
 
 cmake_minimum_required(VERSION 3.20)
-project(FlatRBTreeExample)
+project(HashFlatMapExample)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,14 +12,10 @@ include(GNUInstallDirs)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${GTEST_INCLUDE_DIRS})
 
-find_package(GTest)
-
-enable_testing()
-
 cmake_path(GET CMAKE_CURRENT_SOURCE_DIR PARENT_PATH PARENT_DIR)
 
 # Add a testing executable
-add_executable(${PROJECT_NAME} flat-rb-tree-example.cpp)
+add_executable(${PROJECT_NAME} hash_flat_map_example.cpp)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${PARENT_DIR}/include)
 
@@ -27,7 +23,5 @@ include(${PARENT_DIR}/cmake/CompilerWarnings.cmake)
 include(${PARENT_DIR}/cmake/Sanitizers.cmake)
 
 myproject_set_project_warnings(${PROJECT_NAME} TRUE "X" "" "" "X")
-
-add_compile_options(-pipe -fPIC)
-myproject_enable_sanitizers(${PROJECT_NAME} TRUE TRUE TRUE FALSE TRUE)
+myproject_enable_sanitizers(${PROJECT_NAME} TRUE TRUE TRUE FALSE FALSE)
 
